@@ -1,4 +1,10 @@
 // < ========================================================
+// < Constants, Variables and Declarations
+// < ========================================================
+
+let draggedCard = null;
+
+// < ========================================================
 // < PlayingCard Custom HTML Element / Class
 // < ========================================================
 
@@ -27,18 +33,20 @@ class PlayingCard extends HTMLElement {
         return card;
     }
 
-    // > Update the img child of this card
+    // > Update innerHTML of this card to correct code from svgCodes
     updateImage() {
         let flipped = this.getAttribute('flipped') === 'true';
         if (flipped) {
             let key = 'back';
-            this.innerHTML = codes[key];
+            this.innerHTML = svgCodes[key];
         }
         else {
             let rank = this.getAttribute('rank');
             let suit = this.getAttribute('suit');
-            let key = `${rank}_${suit}`;
-            this.innerHTML = codes[key];
+            if (rank && suit) {
+                let key = `${rank}_${suit}`;
+                this.innerHTML = svgCodes[key];
+            }
         }
     }
 
@@ -46,6 +54,27 @@ class PlayingCard extends HTMLElement {
     flip() {
         let flipped = this.getAttribute('flipped') === 'true';
         this.setAttribute('flipped', !flipped);
+    }
+
+    initListeners() {
+
+        // > Right click to flip card
+        this.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.flip();
+        });
+
+        // > Drag start listener
+        this.addEventListener("dragstart", (e) => {
+            draggedCard = this;
+            setTimeout(() => this.style.opacity = "0.5", 0);
+        });
+
+        // > Drag end listener
+        this.addEventListener("dragend", (e) => {
+            this.style.opacity = "1";
+            draggedCard = null;
+        });
     }
 
     // ~ ========================================================
@@ -63,9 +92,7 @@ class PlayingCard extends HTMLElement {
     connectedCallback() {
         if (!this.initialised) {
             this.updateImage();
-            this.addEventListener('click', () => {
-                this.flip();
-            });
+            this.initListeners();
             this.initialised = true;
         }
     }

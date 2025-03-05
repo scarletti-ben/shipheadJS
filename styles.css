@@ -34,7 +34,8 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-evenly;
+  overflow: hidden;
 }
 
 playing-card {
@@ -45,21 +46,124 @@ playing-card {
   box-sizing: border-box;
 }
 
-/* playing-card:hover {
-  transform: translateY(-16px);
-  box-shadow: 0px -4px 10px rgba(0, 128, 255, 1), 0px 4px 10px rgba(0, 128, 255, 1);
-} */
+.strip {
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.piles {
+  width: auto;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pile {
+  width: auto;
+  height: var(--pch);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#enemy-hand-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(-50%);
+  background-color: transparent;
+}
+
+#enemy-hand-strip > .hand {
+  background-color: transparent;
+}
+
+#enemy-piles-strip {
+  background-color: transparent;
+}
+
+#player-hand-strip {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform: translateY(50%);
+  background-color: transparent;
+} 
+
+#player-hand-strip > .hand {
+  background-color: transparent;
+}
+
+#player-piles-strip {
+  background-color: transparent;
+}
+
+#center-strip {
+  justify-content: space-evenly;
+}
 
 #deck {
-  display: grid;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  box-sizing: border-box;
-  width: 80%;
-  height: 80%;
-  gap: 4px;
-  grid-template-columns: repeat(13, 1fr);
-  grid-template-rows: repeat(4, 1fr);
+  width: auto;
+  height: var(--pch);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#deck playing-card {
+  margin-top: calc(-1.06 * var(--pch));
+}
+#deck playing-card:first-of-type{
+  margin-top: 0px;
+}
+
+#played {
+  width: 35%;
+  height: var(--pch);
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+#played playing-card{
+  margin-left: -48px;
+}
+#played > playing-card:first-of-type{
+  margin-left: 0px;
+}
+
+#discarded {
+  width: auto;
+  height: var(--pch);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#discarded playing-card {
+  margin-top: calc(-1.15 * var(--pch));
+}
+#discarded playing-card:first-of-type{
+  margin-top: 0px;
+}
+
+
+
+.hand playing-card{
+  margin-left: -48px;
+}
+
+.hand > playing-card:first-of-type{
+  margin-left: 0px;
+}
+
+.pile playing-card {
+  margin-top: -78px;
+}
+
+.pile playing-card:first-of-type{
+  margin-top: 0px;
 }
