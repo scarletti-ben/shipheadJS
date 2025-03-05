@@ -6,14 +6,25 @@ class PlayingCard extends HTMLElement {
     static get observedAttributes() {
         return ['rank', 'suit', 'flipped'];
     }
-
-    /** @param {string} rank @param {string} suit @param {boolean} flipped */
-    constructor(rank, suit, flipped = false) {
+    constructor() {
         super();
         this.initialised = false;
-        this.setAttribute('rank', String(rank).toLowerCase());
-        this.setAttribute('suit', String(suit).toLowerCase());
-        this.setAttribute('flipped', flipped);
+    }
+
+    /** 
+     * @param {string | number} rank 
+     * @param {string} suit 
+     * @param {string} [flipped='false'] 
+     * @param {string} [draggable='true'] 
+     * @returns {PlayingCard}
+     * */
+    static create(rank, suit, flipped = 'false', draggable = 'true') {
+        let card = document.createElement('playing-card');
+        card.setAttribute('rank', String(rank).toLowerCase());
+        card.setAttribute('suit', suit.toLowerCase());
+        card.setAttribute('flipped', flipped);
+        card.setAttribute('draggable', draggable);
+        return card;
     }
 
     // > Update the img child of this card
@@ -41,14 +52,14 @@ class PlayingCard extends HTMLElement {
     // ~ Magic Methods
     // ~ ========================================================
 
-    // > Callback when an observed attribute changes
+    // ~ Callback when an observed attribute changes
     attributeChangedCallback(name, current, value) {
         if (this.initialised) {
             this.updateImage();
         }
     }
 
-    // > Callback when the element is added to the DOM
+    // ~ Callback when the element is added to the DOM
     connectedCallback() {
         if (!this.initialised) {
             this.updateImage();
