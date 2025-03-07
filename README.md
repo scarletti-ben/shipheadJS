@@ -31,9 +31,6 @@ let pack = [];
 
 # TODO
 - Fix order / z-index of enemy cards so they display LTR instead or RTL
-- Implement drag and drop system
-    - Contextually aware and handles card validity
-    - Colour piles when dragging / hover over
 - Implement played pile pickup button
 - Hide cursor when dragging, or move card so it doesn't hide the number
 - Animations for card moving
@@ -44,23 +41,25 @@ let pack = [];
 - Burn deck to discarded
 - Draw card
 - Add rules modal
-- Review python code for ideas
-- Conditional for dragging
 
-- Perhaps give card more info about itself
+# Ideas
+- Modifiers
+    - 2 on a 9 burns the deck
 
-- Condition to drag a card from hand
-    - Is it your turn
+# TODO 2
+- Inert state changing
+- Cleanup drag and drop to functions
+- ~~Visible timer when card is played~~
+- Play multiple cards (pending cards)
+- Play pile cards
+- Player class / object
+- Hidden cards always valid to play
+    - Evaluate card AFTER play - pending system
+- "Submit" card
+<!-- ! PENDING CARDS -->
 
-- Condition to drag a card from your face up
-    - Is it your turn
-    - Do you have no hand
+- Fix overlay system
+- Button to overlay all valid cards
+- Make overlay a class
 
-- Condition to drag a card from your face down
-    - Is it your turn
-    - Do you have no hand
-    - Do you have no face up
-
-
-
-- Need an information window with toggles
+- Wait on 8

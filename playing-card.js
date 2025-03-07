@@ -35,6 +35,14 @@ class PlayingCard extends HTMLElement {
     get rank() {
         return this.getAttribute('rank');
     }
+
+    /** 
+     * ~ Get the flipped attribute as boolean
+     * @returns {boolean}  
+     */
+    get flipped() {
+        return this.getAttribute('flipped') === 'true';
+    }
     
     /** 
      * ~ Create and return a playing-card HTML element, useful as constructor does not take arguments
@@ -91,28 +99,28 @@ class PlayingCard extends HTMLElement {
      */
     initListeners() {
 
-        // Add right click listener to flip card
+        // > Add right click listener to flip card
         this.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             this.flip();
         });
 
-        // Add dragstart listener
+        // > Add dragstart listener
         this.addEventListener("dragstart", (event) => {
 
-            if (game.player == 2) {
+            if (!experimental.specialCheck(this)) {
                 event.preventDefault();
                 return;
             }
 
-            event.dataTransfer.setData('id', this.id);
+            draggedElement = this;
 
             let valid = tools.isValidCard(this);
             if (valid) {
-                applyOverlay(played.element);
+                Overlays.apply(center.element);
             }
             else {
-                applyOverlay(played.element, 'rgba(180,30,30,0.15)');
+                Overlays.apply(center.element, 'rgba(180,30,30,0.15)');
             }
 
             // ! EXPERIMENTAL: Fix for overlapping drag image
@@ -128,13 +136,11 @@ class PlayingCard extends HTMLElement {
 
         });
 
-        // Add dragend listener
+        // > Add dragend listener
         this.addEventListener("dragend", (event) => {
-            removeOverlay();
-
-            // ! EXPERIMENTAL: Return card to layout
+            draggedElement = null;
+            Overlays.cleanse(center.element);
             this.style.display = '';
-
         });
 
     }
@@ -147,7 +153,7 @@ class PlayingCard extends HTMLElement {
      * @returns {undefined}
      */
     attributeChangedCallback(name, oldValue, newValue) {
-        if (this.initialised) {
+        if (this.initialised && oldValue !== newValue) {
             this.updateImage();
         }
     }

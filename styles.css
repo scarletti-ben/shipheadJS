@@ -41,6 +41,7 @@ html, body {
 playing-card {
   user-select: none;
   display: inline-block;
+  position: relative;
   width: var(--pcw);
   height: var(--pch);
   box-sizing: border-box;
@@ -129,6 +130,10 @@ playing-card {
   z-index: 99;
 }
 
+.hidden {
+  display: none !important;
+}
+
 #information > div {
   word-wrap: break-word;
   word-break: break-all;
@@ -151,7 +156,7 @@ playing-card {
   margin-top: 0px;
 }
 
-#played {
+#center {
   /* min-width: var(--pcw);
   max-width: 35%; */
   width: 35%;
@@ -161,10 +166,10 @@ playing-card {
   justify-content: center;
   align-items: center;
 }
-#played playing-card{
+#center playing-card{
   margin-left: -48px;
 }
-#played > playing-card:first-of-type{
+#center > playing-card:first-of-type{
   margin-left: 0px;
 }
 

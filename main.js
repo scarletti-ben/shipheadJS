@@ -11,11 +11,75 @@ let information = document.getElementById("information");
 // < Typed Declarations
 // < ========================================================
 
-/** @type {HTMLElement} */
-let overlay;
+/** @type {PlayingCard | null} */
+let draggedElement = null;
 
-let overlays = {
-    
+/** @type {ToolbarContainer} */
+let toolbarContainer;
+
+// < ========================================================
+// < Overlays Class
+// < ========================================================
+
+class Overlays {
+
+    /** @type {HTMLElement[]} */
+    static elements = [];
+
+    /**
+     * ~ Adds an overlay with a specified color to an element
+     * @param {HTMLElement} element
+     * @param {string} color
+     */
+    static apply(element, color = 'rgba(0, 180, 120, 0.15)') {
+        let overlay = document.createElement('div');
+        overlay.classList.add('overlay');
+        element.style.position = 'relative';
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.right = '0';
+        overlay.style.bottom = '0';
+        overlay.style.backgroundColor = color;
+        overlay.style.pointerEvents = 'none';
+        // overlay.style.zIndex = '10';
+        element.appendChild(overlay);
+        Overlays.elements.push(element);
+    }
+
+    /** 
+     * ~ Removes overlay child from a given element
+     * @param {HTMLElement} element
+     * @returns {undefined}  
+     */
+    static cleanse(element) {
+        if (Overlays.elements.includes(element)) {
+            element.style.position = '';
+            let overlay = element.querySelector('.overlay');
+            if (overlay) {
+                element.removeChild(overlay);
+            }
+            let index = Overlays.elements.indexOf(element);
+            if (index !== -1) {
+                Overlays.elements.splice(index, 1);
+            }
+        }
+    }
+
+    /** 
+     * ~ Adds an overlay to an element, with timeout to remove it
+     * @param {HTMLElement} element
+     * @param {number} milliseconds
+     * @param {string} color
+     * @returns {undefined}  
+     */
+    static temporary(element, milliseconds = 1000, color = 'rgba(0, 180, 120, 0.15)') {
+        Overlays.apply(element, color);
+        setTimeout(() => {
+            Overlays.cleanse(element);
+        }, milliseconds);
+    }
+
 }
 
 // * ========================================================
@@ -161,7 +225,7 @@ class Pile {
 // < ========================================================
 
 let deck = new Pile('deck');
-let played = new Pile('played');
+let center = new Pile('center');
 let burned = new Pile('burned');
 let playerHand = new Pile('player-hand');
 let playerL = new Pile('player-left');
@@ -223,35 +287,6 @@ function remaining(object) {
 }
 
 /**
- * ~ Adds an overlay with a specified color to a container, stored as overlay global
- * @param {HTMLElement} container
- * @param {string} color
- */
-function applyOverlay(container, color = 'rgba(0, 180, 120, 0.15)') {
-    overlay = document.createElement('div');
-    overlay.style.position = 'absolute';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.right = '0';
-    overlay.style.bottom = '0';
-    overlay.style.backgroundColor = color;
-    overlay.style.pointerEvents = 'none';
-    overlay.style.zIndex = '10';
-    container.style.position = 'relative';
-    container.appendChild(overlay);
-}
-
-/** 
- * ~ Removes the overlay element from its parent  
- * @returns {undefined}  
- */
-function removeOverlay() {
-    if (overlay && overlay.parentElement) {
-        overlay.parentElement.removeChild(overlay)
-    }
-}
-
-/**
  * ~ Transfer a given card from one container to another
  * @param {PlayingCard} card
  * @param {Pile} source
@@ -273,8 +308,10 @@ function transfer(card, source, destination, flipped = false) {
  * @param {Pile} destination
  * @returns {undefined}
  */
-function transferAll(source, destination) {
+function transferAll(source, destination, flipped = 'false') {
     while (source.element.firstChild) {
+        let card = source.element.firstChild;
+        card.flip(flipped);
         destination.add(source.element.firstChild);
     }
 }
@@ -287,7 +324,7 @@ function transferAll(source, destination) {
 function draw(destination, flipped = false, n = 1) {
     for (let i = 0; i < n; i++) {
         let cards = deck.cards;
-        if (cards) {
+        if (cards.length > 0) {
             let card = deck.pop();
             card.flip(flipped);
             deck.remove(card);
@@ -335,23 +372,126 @@ const experimental = {
         /** @type {PlayingCard} */
         let card;
         let cards = computerHand.cards.filter(card => tools.isValidCard(card));
-        if (cards) {
+        if (cards.length > 0) {
             card = tools.choice(cards);
-            played.add(card);
+            center.add(card);
             card.flip(false);
             if (card.rank === '10') {
-                transferAll(played, burned);
+                transferAll(center, burned);
                 experimental.computerPlayRandom();
                 return;
             }
 
         } else {
-            transferAll(played, computerHand);
+            transferAll(center, computerHand, true);
         }
         game.player = 1;
         setTimeout(() => {
             update();
         }, 0);
+    },
+
+    burn(switching = true) {
+        transferAll(center, burned, false);
+        if (switching) {
+            tools.switchPlayer();
+        }
+    },
+
+    pickup(switching = true) {
+        let pile = game.player === 1 ? playerHand : computerHand;
+        let flipped = game.player === 1 ? false : true
+        transferAll(center, pile, flipped);
+        if (switching) {
+            tools.switchPlayer();
+        }
+    },
+
+    animateOverlay(element, duration = 1000) {
+
+        if (!tools.allowsPositionedChildren(element)) {
+            throw new Error("Element must allow positioned children")
+        }
+
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '0',
+            backgroundColor: 'rgba(128, 0, 128, 0.5)',
+            transition: `height ${duration}ms linear`
+        });
+
+        element.appendChild(overlay);
+
+        overlay.offsetHeight;
+
+        overlay.addEventListener('transitionend', () => overlay.remove());
+
+        requestAnimationFrame(() => {
+            overlay.style.height = '100%';
+        });
+
+    },
+
+    /** 
+     * ~ Check if a card is in the active pile
+     * @param {PlayingCard} _card
+     * @returns {boolean}
+     */
+    specialCheck(_card) {
+        let array;
+        if (game.player === 1) {
+            if (playerHand.cards.length > 0) {
+                array = playerHand.cards;
+            }
+            else {
+                let cards = [...playerL.cards, ...playerM.cards, ...playerR.cards]
+                let shown = cards.filter(card => !card.flipped);
+                let hidden = cards.filter(card => card.flipped);
+                if (shown.length > 0) {
+                    array = shown;
+                }
+                else if (hidden.length > 0) {
+                    array = hidden;
+                }
+                else {
+                    alert(`Player ${game.player} has won`)
+                }
+            }
+        } else if (game.player === 2) {
+            if (computerHand.cards.length > 0) {
+                array = computerHand.cards;
+            } else {
+                let cards = [...computerL.cards, ...computerM.cards, ...computerR.cards];
+                let shown = cards.filter(card => !card.flipped);
+                let hidden = cards.filter(card => card.flipped);
+                if (shown.length > 0) {
+                    array = shown;
+                } else if (hidden.length > 0) {
+                    array = hidden;
+                } else {
+                    alert(`Player ${game.player} has won`);
+                }
+            }
+        }
+        if (array && array.length > 0) {
+            return array.includes(_card);
+        }
+        return false;
+    },
+
+    showValid() {
+        let cards = document.querySelectorAll('playing-card');
+        for (let card of cards) {
+            let playable = experimental.specialCheck(card);
+            let valid = tools.isValidCard(card);
+            if (playable && valid) {
+                Overlays.temporary(card, 1500, 'rgba(0, 200, 128, 0.4)')
+            }
+        }
     }
 
 };
@@ -367,10 +507,10 @@ const experimental = {
 const tools = {
 
     /** 
-     * ~ Get the length of a given object  
+     * ~ Swtich to the next player, or a given player number
      * @param {number | null} [n=null]
      * @returns {undefined}
-     */ 
+     */
     switchPlayer(n = null) {
         if (n !== null) {
             game.player = n;
@@ -455,9 +595,46 @@ const tools = {
         let validRanks = currentValidRanks();
         let rank = card.rank;
         return validRanks.includes(rank);
+    },
+
+    /** 
+     * ~ Toggle visibility for an element via .hidden class
+     * @param {HTMLElement} element
+     * @returns {undefined}
+     */
+    toggle(element) {
+        element.classList.toggle('hidden');
+    },
+
+    /** 
+     * ~ Toggle visibility of information window
+     * @returns {undefined}
+     */
+    toggleInformation() {
+        tools.toggle(information);
+    },
+
+    /**
+     * ~ Checks if an element allows for relative or absolute positioned children
+     * @param {HTMLElement} element
+     * @returns {boolean}
+     */
+    allowsPositionedChildren(element) {
+        const position = getComputedStyle(element).position;
+        return position !== 'static';
+    },
+
+    /**
+     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
+     * @param {Function} callback
+     * @returns {undefined}
+     */
+    postpone(callback) {
+        setTimeout(callback, 0);
     }
 
 };
+
 
 // ! ========================================================
 // ! Python Translations
@@ -496,7 +673,8 @@ function getValidRanks(rank) {
             valid = ['2', '3', '4', '5', '6', '7', '8', '9'];
         }
     } else if (rank === '10') {
-        throw new Error("Anchor rank should never be 10");
+        // throw new Error("Anchor rank should never be 10");
+        valid = [];
     } else if (rank === 'jack') {
         valid = ['2', '7', '10', 'jack', 'queen', 'king', 'ace'];
     } else if (rank === 'queen') {
@@ -510,7 +688,7 @@ function getValidRanks(rank) {
 }
 
 /** 
- * ~ Get list of the valid ranks that can play on the top played card
+ * ~ Get list of the valid ranks that can play on the top center card
  * @returns {Array<number | string>}
  */
 function currentValidRanks() {
@@ -524,15 +702,15 @@ function currentValidRanks() {
 }
 
 /** 
- * ~ Get the first card from the played cards that is not a '7'  
+ * ~ Get the first card from the center cards that is not a '7'  
  * @returns {PlayingCard | undefined} The first card not of rank '7', or undefined if none found  
  */
 function getAnchorCard() {
-    let cards = played.cards.slice().reverse()
+    let cards = center.cards.slice().reverse()
     for (let card of cards) {
         if (card.rank !== '7') {
             return card;
-        }  
+        }
     }
 }
 
@@ -563,29 +741,29 @@ function initListeners() {
 
     // > Attach anonymous function call to document click event
     document.addEventListener("keydown", (e) => {
-        if (e.key === '1') {
-            let card = PlayingCard.create('2', 'clubs');
-            played.add(card);
-        }
+
         if (e.key === ' ') {
-            transferAll(played, playerHand);
+            experimental.pickup(true);
+            setTimeout(() => {
+                experimental.computerPlayRandom();
+            }, 500);
         }
-        
+
         if (e.key === 's') {
             tools.switchPlayer();
         }
 
         if (e.key === 't') {
-            let x = getAnchorCard(played, playerHand);
+            let x = getAnchorCard(center, playerHand);
             console.log(x)
         }
 
-        if (e.key === 's') {
-            playerHand.sort();
+        if (e.key === 'x') {
+            experimental.showValid();
         }
 
         if (e.key === 'b') {
-            transferAll(played, burned);
+            transferAll(center, burned);
         }
 
         if (e.key === 'r') {
@@ -595,13 +773,17 @@ function initListeners() {
         if (e.key === 'd') {
             draw(playerHand, 'false');
         }
+
+        if (e.key === 'e') {
+            experimental.animateOverlay(center.top, 1000);
+        }
+
     });
 
-    played.element.addEventListener("drop", (event) => {
+    center.element.addEventListener("drop", (event) => {
         event.preventDefault();
 
-        let id = event.dataTransfer.getData('id');
-        const card = tools.getCard(id);
+        let card = draggedElement;
 
         let validRanks = currentValidRanks();
         let rank = card.rank;
@@ -609,25 +791,44 @@ function initListeners() {
             return;
         }
 
-        played.add(card);
+        center.add(card);
         card.flip(false);
 
-        if (rank === '10') {
-            transferAll(played, burned);
-            setTimeout(() => {
-                update();
-            }, 0);
-        }
-
-        game.player = 2;
-
         setTimeout(() => {
+            if (rank === '10') {
+                experimental.burn(false);
+            }
+            else {
+                tools.switchPlayer(2);
+                let milliseconds = 1000;
+                tools.postpone(() => experimental.animateOverlay(card, milliseconds));
+                setTimeout(() => experimental.computerPlayRandom(), milliseconds);
+            }
+
             update();
-            experimental.computerPlayRandom();
-        }, 500);
-        
+
+
+        }, 50);
+
     });
 
+}
+
+/** 
+ * ~ Initialise the toolbarContainer and add buttons
+ * @returns {null}  
+ */
+function initToolbar() {
+    toolbarContainer = new ToolbarContainer();
+    toolbarContainer.createButton(0, "-", "", null);
+    toolbarContainer.createButton(1, "R", "computerPlayRandom", () => experimental.computerPlayRandom());
+    toolbarContainer.createButton(2, "P", "pickup", () => experimental.pickup());
+    toolbarContainer.createButton(3, "S", "nextPlayer", () => {
+        tools.switchPlayer();
+        experimental.computerPlayRandom();
+    });
+    toolbarContainer.createButton(4, "B", "burnCenter", () => experimental.burn());
+    toolbarContainer.createButton(5, "I", "toggleInformation", () => tools.toggleInformation());
 }
 
 /** 
@@ -653,13 +854,14 @@ function initIntervals() {
 function updateInfo() {
 
     let validRanks = currentValidRanks();
+
     let anchorCard = getAnchorCard();
     let anchorRank = 'N/A';
     if (anchorCard) {
         anchorRank = anchorCard.rank;
     }
 
-    let topCard = played.top;
+    let topCard = center.top;
     let topRank = 'N/A';
     if (topCard) {
         topRank = topCard.rank;
@@ -676,7 +878,7 @@ function updateInfo() {
         <div>Anchor Rank: ${anchorRank}</div>
         <br>
         <div>Cards in Deck: ${deck.length}</div>
-        <div>Cards in Played: ${played.length}</div>
+        <div>Cards in Center: ${center.length}</div>
         <div>Cards in Burned: ${burned.length}</div>
         <div>Total Cards: ${document.querySelectorAll('playing-card').length}</div>
     `;
@@ -708,34 +910,31 @@ function update() {
  */
 function main() {
 
-    let tbc = new ToolbarContainer();
-    tbc.createButton(0, "-", "", null);
-    tbc.createButton(1, "R", "computerPlayRandom", () => experimental.computerPlayRandom());
-    tbc.createButton(2, "P", "pickup", () => transferAll(played, playerHand));
-    tbc.createButton(3, "S", "nextPlayer", () => {
-        tools.switchPlayer();
-        experimental.computerPlayRandom();
-    });
-    tbc.createButton(4, "B", "burnPlayed", () => transferAll(played, burned));
-
+    // > Generate cards and shuffle the deck
     populateDeck();
+
+    // > Trim the deck by 26 cards for testing purposes
+    for (let i = 0; i < 26; i++) {
+        let card = deck.top;
+        transfer(card, deck, burned);
+    }
+
+    // > Deal cards to player hands
     draw(playerHand, false, 5);
     draw(computerHand, true, 5);
 
+    // > Deal cards to piles on the table
     let piles = [playerL, playerM, playerR, computerL, computerM, computerR];
     for (let pile of piles) {
         draw(pile, true);
         draw(pile);
     }
 
-    for (let i = 0; i < 26; i++) {
-        let card = deck.top;
-        transfer(card, deck, burned);
-    }
-
+    // > Initialise and update information
     initListeners();
-    // initIntervals();
+    initToolbar();
     update();
+
 }
 
 // < ========================================================
@@ -743,3 +942,12 @@ function main() {
 // < ========================================================
 
 main();
+
+// def pile(self):
+// """Return the appropriate active list of cards"""
+//     if any(self.hand.cards):
+//         return self.hand
+//     elif any(self.shown.cards):
+//         return self.shown
+//     elif any(self.blind.cards):
+//         return self.blind
