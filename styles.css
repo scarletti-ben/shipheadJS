@@ -46,7 +46,7 @@ playing-card {
   box-sizing: border-box;
 }
 
-.strip {
+.band {
   width: 100%;
   height: auto;
   display: flex;
@@ -71,7 +71,7 @@ playing-card {
   justify-content: center;
 }
 
-#enemy-hand-strip {
+#computer-hand-band {
   position: absolute;
   left: 0;
   top: 0;
@@ -79,15 +79,15 @@ playing-card {
   background-color: transparent;
 }
 
-#enemy-hand-strip > .hand {
+#computer-hand-band > .hand {
   background-color: transparent;
 }
 
-#enemy-piles-strip {
+#computer-piles-band {
   background-color: transparent;
 }
 
-#player-hand-strip {
+#player-hand-band {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -95,19 +95,49 @@ playing-card {
   background-color: transparent;
 } 
 
-#player-hand-strip > .hand {
+#player-hand-band > .hand {
   background-color: transparent;
 }
 
-#player-piles-strip {
+#player-piles-band {
   background-color: transparent;
 }
 
-#center-strip {
+#center-band {
   justify-content: space-evenly;
 }
 
+#information {
+  overflow: auto;
+  position: absolute;
+  font-size: 10px;
+  scrollbar-gutter: stable both-edges;
+  width: 15%;
+  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  justify-content: center;
+  align-items: center;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  margin: 16px;
+  user-select: none;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.2);
+  z-index: 99;
+}
+
+#information > div {
+  word-wrap: break-word;
+  word-break: break-all;
+  /* white-space: normal; */
+  text-align: center;
+}
+
 #deck {
+  min-width: var(--pcw);
   width: auto;
   height: var(--pch);
   display: flex;
@@ -122,6 +152,8 @@ playing-card {
 }
 
 #played {
+  /* min-width: var(--pcw);
+  max-width: 35%; */
   width: 35%;
   height: var(--pch);
   display: flex;
@@ -136,17 +168,19 @@ playing-card {
   margin-left: 0px;
 }
 
-#discarded {
+#burned {
+  min-width: var(--pcw);
   width: auto;
   height: var(--pch);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-#discarded playing-card {
-  margin-top: calc(-1.15 * var(--pch));
+#burned playing-card {
+  /* margin-top: calc(-1.15 * var(--pch)); */
+    margin-top: calc(-1.06 * var(--pch));
 }
-#discarded playing-card:first-of-type{
+#burned playing-card:first-of-type{
   margin-top: 0px;
 }
 
