@@ -730,7 +730,7 @@ function main() {
 
     for (let i = 0; i < 26; i++) {
         let card = deck.top;
-        transfer(card, deck, burned, true);
+        transfer(card, deck, burned);
     }
 
     initListeners();
