@@ -18,6 +18,48 @@ let overlays = {
     
 }
 
+// * ========================================================
+// * Toolbar Class
+// * ========================================================
+
+/** 
+ * ~ Custom #toolbar-container, with .toolbar-row children
+ */
+class ToolbarContainer {
+    constructor() {
+        this.element = document.getElementById('toolbar-container');
+    }
+
+    // > Add row to the toolbar
+    addRow() {
+        let row = document.createElement('div');
+        row.className = 'toolbar-row';
+        this.element.appendChild(row);
+    }
+
+    // > Create and add a button to a given row index
+    createButton(rowIndex, text, title, onClick = null) {
+        let rows = this.element.children.length;
+        if (rowIndex >= rows) {
+            let needed = rowIndex - rows;
+            for (let i = 0; i <= needed; i++) {
+                this.addRow();
+            }
+        }
+        const row = this.element.children[rowIndex];
+        let button = document.createElement('div');
+        button.className = 'toolbar-button';
+        button.title = title;
+        button.textContent = text;
+        if (onClick) {
+            button.addEventListener('click', (e) => {
+                onClick(e);
+            });
+        }
+        row.appendChild(button);
+    }
+}
+
 // < ========================================================
 // < HTML Wrapper Classes
 // < ========================================================
@@ -665,6 +707,17 @@ function update() {
  * @returns {undefined}  
  */
 function main() {
+
+    let tbc = new ToolbarContainer();
+    tbc.createButton(0, "-", "", null);
+    tbc.createButton(1, "R", "computerPlayRandom", () => experimental.computerPlayRandom());
+    tbc.createButton(2, "P", "pickup", () => transferAll(played, playerHand));
+    tbc.createButton(3, "S", "nextPlayer", () => {
+        tools.switchPlayer();
+        experimental.computerPlayRandom();
+    });
+    tbc.createButton(4, "B", "burnPlayed", () => transferAll(played, burned));
+
     populateDeck();
     draw(playerHand, false, 5);
     draw(computerHand, true, 5);
