@@ -5,7 +5,15 @@
 let suits = ['clubs', 'diamonds', 'hearts', 'spades']
 let ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
 let startValues = [30, 0, 1, 2, 3, 40, 20, 10, 60, 4, 5, 6, 50];
+let specialRanks = ['2', '7', '8', '9', '10'];
 let information = document.getElementById("information");
+
+// < ========================================================
+// < Players
+// < ========================================================
+
+let human = new Human();
+let computer = new Computer();
 
 // < ========================================================
 // < Typed Declarations
@@ -16,6 +24,130 @@ let draggedElement = null;
 
 /** @type {ToolbarContainer} */
 let toolbarContainer;
+
+/**
+ * ~ 
+ * @param {HTMLElement} element
+ * @param {number} duration
+ * @param {number} height
+ * @returns {undefined}
+ */
+function changeHeight(element, duration = 1000, height = 100) {
+    const start = performance.now();
+    const step = () => {
+        const now = performance.now();
+        const delta = Math.min((now - start) / duration, 1);
+        element.style.height = (delta * height) + "%";
+        if (delta < 1) {
+            requestAnimationFrame(step);
+        }
+    };
+    step();
+}
+
+/**
+ * ~ 
+ * @param {HTMLElement} element
+ * @param {number} duration
+ * @param {number} height
+ * @returns {undefined}
+ */
+function growAndDelete(element, duration = 1000, height = 100) {
+    changeHeight(element, duration, height);
+    setTimeout(() => {
+        element.remove()
+    }, duration + 1);
+}
+
+class Pending {
+
+    /** @type {{ card: PlayingCard, source: Pile }[]} */
+    static data = [];
+
+    static empty() {
+        console.log('emptying pending data');
+        Pending.data = [];
+    }
+
+    static submit(card, source, duration = 1000) {
+        let playable;
+        let data = Pending.data;
+        if (data.length > 0) {
+            let rank = data[0].card.rank;
+            assert(data.every(entry => entry.card.rank === rank));
+            playable = card.rank === rank;
+        }
+        else {
+            playable = true;
+        }
+
+        let checker = tools.isValidCard(card);
+        // console.log('checker', checker)
+
+        if (playable && checker) {
+
+            let entry = { 'card': card, 'source': source };
+            data.push(entry);
+            center.add(card);
+            card.flip(false);
+            setTimeout(() => {
+                experimental.animateOverlay(card, duration)
+            }, 0);
+
+        }
+        else {
+            console.log(`${card.rank} is not playable`)
+        }
+
+    }
+
+    static process() {
+        let data = Pending.data;
+        if (!data.length > 0) {
+            console.log('Nothing to process');
+            return false;
+        }
+        // POSTIT - Current valid ranks does not care about pending
+        // Therefore you cannot add a second 10 as it is not valid
+        // And the card is essentially only checking if it can be played on itself as it becomes the anchor card
+        let ranks = currentValidRanks();
+        let issues = false;
+        for (let { card, source } of data) {
+            if (!ranks.includes(card.rank)) {
+                source.add(card);
+                issues = true;
+            }
+        }
+        if (issues) {
+            console.log('Processor met issues');
+            return
+        }
+        // console.log('Processor met no issues');
+        let rank = data[0].card.rank;
+        if (rank !== '7') {
+            game.inert = false;
+        } else {
+            game.inert = true;
+        }
+
+        setTimeout(() => {
+            Pending.empty();
+            if (rank === '10') {
+                experimental.burn(false);
+            }
+            else {
+                setTimeout(() => {
+                    setTimeout(() => {
+                        tools.switchPlayer(2);
+                        experimental.computerPlayRandom();
+                    }, 0);
+                }, 0);
+            }
+            update();
+        }, 0);
+
+    }
+}
 
 // < ========================================================
 // < Overlays Class
@@ -42,7 +174,6 @@ class Overlays {
         overlay.style.bottom = '0';
         overlay.style.backgroundColor = color;
         overlay.style.pointerEvents = 'none';
-        // overlay.style.zIndex = '10';
         element.appendChild(overlay);
         Overlays.elements.push(element);
     }
@@ -227,10 +358,10 @@ class Pile {
 let deck = new Pile('deck');
 let center = new Pile('center');
 let burned = new Pile('burned');
-let playerHand = new Pile('player-hand');
-let playerL = new Pile('player-left');
-let playerM = new Pile('player-middle');
-let playerR = new Pile('player-right');
+let humanHand = new Pile('human-hand');
+let humanL = new Pile('human-left');
+let humanM = new Pile('human-middle');
+let humanR = new Pile('human-right');
 let computerHand = new Pile('computer-hand');
 let computerL = new Pile('computer-left');
 let computerM = new Pile('computer-middle');
@@ -257,19 +388,13 @@ const game = {
 // < Utility Functions
 // < ========================================================
 
-/** 
- * ~ Shuffle an array in place  
- * @param {Array} array - The array to shuffle  
- * @returns {undefined}  
+/**  
+ * > Prevents the default action of an event  
+ * @param {Event} event - The event to nullify  
+ * @returns {null}  
  */
-function shuffle(array) {
-    let currentIndex = array.length;
-    while (currentIndex != 0) {
-        let randomIndex = Math.floor(Math.random() * currentIndex);
-        currentIndex--;
-        [array[currentIndex], array[randomIndex]] = [
-            array[randomIndex], array[currentIndex]];
-    }
+function nullify(event) {
+    event.preventDefault();
 }
 
 /** 
@@ -345,7 +470,7 @@ function populateDeck() {
             pack.push(card);
         }
     }
-    shuffle(pack);
+    tools.shuffle(pack);
     for (let [i, card] of pack.entries()) {
         card.id = `playing-card-${i}`;
         card.flip();
@@ -363,32 +488,64 @@ function populateDeck() {
  */
 const experimental = {
 
+    // getValidActions() {
+    //     let actions = [];
+    //     let rank = getAnchorRank();
+    //     if (rank === '8') {
+    //         actions.push('wait');
+    //     } else {
+    //         actions.push('pickup');
+    //     }
+    //     if (this.canPlay()) {
+    //         actions.push('play');
+    //     }
+    //     return actions;
+    // },
+
     computerPlayRandom() {
         update();
         if (game.player !== 2) {
             console.log("It is not the computer's turn")
             return;
         }
-        /** @type {PlayingCard} */
-        let card;
-        let cards = computerHand.cards.filter(card => tools.isValidCard(card));
-        if (cards.length > 0) {
-            card = tools.choice(cards);
-            center.add(card);
-            card.flip(false);
-            if (card.rank === '10') {
-                transferAll(center, burned);
-                experimental.computerPlayRandom();
-                return;
-            }
 
+        let eight = getAnchorCard()?.rank === '8';
+
+        let active = experimental.activePile();
+        let cards = active.filter(card => tools.isValidCard(card));
+
+        if (cards.length > 0) {
+            let ranks = cards.map(card => card.rank);
+            let rank = tools.choice(ranks);
+            let selected = cards.filter(card => card.rank === rank);
+            for (let card of selected) {
+                center.add(card);
+                card.flip(false);
+            }
+            if (rank === '10') {
+                transferAll(center, burned);
+                console.log('Computer played 10, delaying 1000ms')
+                setTimeout(() => {
+                    experimental.computerPlayRandom();
+                }, 1000);
+                return;
+            } else if (rank !== '7') {
+                game.inert = false;
+            } else {
+                game.inert = true;
+            }
+        } else if (eight) {
+            experimental.waitEight();
         } else {
+            console.warn('Picking up', 'hand is', computerHand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
             transferAll(center, computerHand, true);
         }
+
         game.player = 1;
         setTimeout(() => {
             update();
         }, 0);
+
     },
 
     burn(switching = true) {
@@ -399,7 +556,7 @@ const experimental = {
     },
 
     pickup(switching = true) {
-        let pile = game.player === 1 ? playerHand : computerHand;
+        let pile = game.player === 1 ? humanHand : computerHand;
         let flipped = game.player === 1 ? false : true
         transferAll(center, pile, flipped);
         if (switching) {
@@ -407,33 +564,31 @@ const experimental = {
         }
     },
 
-    animateOverlay(element, duration = 1000) {
-
-        if (!tools.allowsPositionedChildren(element)) {
-            throw new Error("Element must allow positioned children")
+    cleanup(event) {
+        if (event.propertyName == 'opacity') {
+            void this.offsetHeight;
+            this.style.opacity = '0'
+            this.removeEventListener('transitionend', experimental.cleanup);
         }
+    },
 
+    /** 
+     * ~ Text
+     * @param {HTMLElement} element
+     * @returns {undefined}
+     */
+    animateOverlay(element, duration = 1000) {
         const overlay = document.createElement('div');
         Object.assign(overlay.style, {
             position: 'absolute',
             top: '0',
             left: '0',
             width: '100%',
-            height: '0',
+            height: '0%',
             backgroundColor: 'rgba(128, 0, 128, 0.5)',
-            transition: `height ${duration}ms linear`
         });
-
         element.appendChild(overlay);
-
-        overlay.offsetHeight;
-
-        overlay.addEventListener('transitionend', () => overlay.remove());
-
-        requestAnimationFrame(() => {
-            overlay.style.height = '100%';
-        });
-
+        growAndDelete(overlay, duration);
     },
 
     /** 
@@ -444,11 +599,11 @@ const experimental = {
     specialCheck(_card) {
         let array;
         if (game.player === 1) {
-            if (playerHand.cards.length > 0) {
-                array = playerHand.cards;
+            if (humanHand.cards.length > 0) {
+                array = humanHand.cards;
             }
             else {
-                let cards = [...playerL.cards, ...playerM.cards, ...playerR.cards]
+                let cards = [...humanL.cards, ...humanM.cards, ...humanR.cards]
                 let shown = cards.filter(card => !card.flipped);
                 let hidden = cards.filter(card => card.flipped);
                 if (shown.length > 0) {
@@ -483,6 +638,49 @@ const experimental = {
         return false;
     },
 
+    /** 
+     * ~ Get the active pile
+     * @returns {PlayingCard[]}
+     */
+    activePile() {
+        let array;
+        if (game.player === 1) {
+            if (humanHand.cards.length > 0) {
+                array = humanHand.cards;
+            }
+            else {
+                let cards = [...humanL.cards, ...humanM.cards, ...humanR.cards]
+                let shown = cards.filter(card => !card.flipped);
+                let hidden = cards.filter(card => card.flipped);
+                if (shown.length > 0) {
+                    array = shown;
+                }
+                else if (hidden.length > 0) {
+                    array = hidden;
+                }
+                else {
+                    alert(`Player ${game.player} has won`)
+                }
+            }
+        } else if (game.player === 2) {
+            if (computerHand.cards.length > 0) {
+                array = computerHand.cards;
+            } else {
+                let cards = [...computerL.cards, ...computerM.cards, ...computerR.cards];
+                let shown = cards.filter(card => !card.flipped);
+                let hidden = cards.filter(card => card.flipped);
+                if (shown.length > 0) {
+                    array = shown;
+                } else if (hidden.length > 0) {
+                    array = hidden;
+                } else {
+                    alert(`Player ${game.player} has won`);
+                }
+            }
+        }
+        return array;
+    },
+
     showValid() {
         let cards = document.querySelectorAll('playing-card');
         for (let card of cards) {
@@ -492,9 +690,27 @@ const experimental = {
                 Overlays.temporary(card, 1500, 'rgba(0, 200, 128, 0.4)')
             }
         }
-    }
+    },
+
+    waitEight() {
+        game.inert = true;
+        tools.switchPlayer();
+    },
 
 };
+
+/**  
+ * ~ Assert that a condition is true, throwing an error if false  
+ * @param {boolean} condition  
+ * @param {string} message
+ * @returns {undefined}
+ * @throws {Error} If the condition is false  
+ */
+function assert(condition, message = "Assertion failed") {
+    if (!condition) {
+        throw new Error(message);
+    }
+}
 
 // < ========================================================
 // < Tools Object
@@ -631,10 +847,25 @@ const tools = {
      */
     postpone(callback) {
         setTimeout(callback, 0);
-    }
+    },
+
+    /** 
+     * ~ Shuffle an array in place  
+     * @param {Array} array - The array to shuffle  
+     * @returns {undefined}  
+     */
+    shuffle(array) {
+        let currentIndex = array.length;
+        while (currentIndex != 0) {
+            let randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+    },
+
 
 };
-
 
 // ! ========================================================
 // ! Python Translations
@@ -706,12 +937,22 @@ function currentValidRanks() {
  * @returns {PlayingCard | undefined} The first card not of rank '7', or undefined if none found  
  */
 function getAnchorCard() {
-    let cards = center.cards.slice().reverse()
+    let cards = center.cards.slice().reverse();
+    let pending = Pending.data.map(data => data.card);
     for (let card of cards) {
-        if (card.rank !== '7') {
+        if (card.rank !== '7' && !pending.includes(card)) {
             return card;
         }
     }
+}
+
+/** 
+ * ~ Get the first rank from the center cards that is not a '7'
+ * @returns {string | undefined} The first rank that is not '7', or undefined if none found 
+ */
+function getAnchorRank() {
+    let card = getAnchorCard();
+    return card?.rank;
 }
 
 // < ========================================================
@@ -724,10 +965,95 @@ function getAnchorCard() {
  */
 function initListeners() {
 
-    // > Attach anonymous function call to document click event
-    document.addEventListener("click", () => {
+    let wait = document.getElementById('wait-button');
+    wait.onclick = () => {
+        let actions = human.getValidActions();
+        if (actions.includes('wait')) {
+            experimental.waitEight();
+            experimental.computerPlayRandom();
+        }
+    }
+
+    let pickup = document.getElementById('pickup-button');
+    pickup.onclick = () => {
+        let actions = human.getValidActions();
+        if (actions.includes('pickup')) {
+            experimental.pickup(true);
+            setTimeout(() => {
+                experimental.computerPlayRandom();
+            }, 500);
+        }
+    }
+
+    // ! ========================================================
+    // ! Drag and Drop Methods
+    // ! ========================================================
+
+    document.addEventListener("dragstart", (event) => {
+
+        let card = event.target.closest("playing-card");
+        if (!card) {
+            return;
+        }
+
+        if (!human.canPlay()) {
+            console.log('Human cannot drag this, and cannot play');
+            // event.preventDefault();
+            // return;
+        }
+
+        let elligibleCards = human.elligibleCards;
+        if (!elligibleCards.includes(card)) {
+            console.log('Human cannot drag this, but can play');
+            event.preventDefault();
+            return;
+        }
+
+        draggedElement = card;
+
+        let valid = tools.isValidCard(card);
+        if (valid) {
+            Overlays.apply(center.element);
+        } else {
+            Overlays.apply(center.element, "rgba(180,30,30,0.15)");
+        }
+
+        let clone = card.cloneNode(true);
+        clone.style.position = "absolute";
+        clone.style.top = "-9999px";
+        document.body.appendChild(clone);
+        event.dataTransfer.setDragImage(clone, 0, 0);
+        setTimeout(() => document.body.removeChild(clone), 0);
+
+        setTimeout(() => card.style.display = "none", 1);
 
     });
+
+    center.element.addEventListener("drop", (event) => {
+        event.preventDefault();
+        let card = draggedElement;
+        let duration = 1000;
+        let pending = Pending.data.length > 0;
+        Pending.submit(card, humanHand, duration);
+        if (!pending) {
+            setTimeout(() => {
+                Pending.process();
+            }, duration);
+        }
+        else {
+            console.log('card pending already, implement timer reset and variable speed')
+        }
+    });
+
+    document.addEventListener("dragend", (event) => {
+        if (draggedElement) {
+            Overlays.cleanse(center.element);
+            draggedElement.style.display = "";
+            draggedElement = null;
+        }
+    });
+
+    // ! ========================================================
 
     // > Hide the drag not allowed cursor
     document.addEventListener("dragover", (event) => {
@@ -739,7 +1065,7 @@ function initListeners() {
         event.preventDefault();
     });
 
-    // > Attach anonymous function call to document click event
+    // > Handle keyboard key presses
     document.addEventListener("keydown", (e) => {
 
         if (e.key === ' ') {
@@ -753,9 +1079,20 @@ function initListeners() {
             tools.switchPlayer();
         }
 
+        if (e.key === '8') {
+            experimental.waitEight();
+            experimental.computerPlayRandom();
+        }
+
         if (e.key === 't') {
-            let x = getAnchorCard(center, playerHand);
+            let x = getAnchorCard(center, humanHand);
             console.log(x)
+        }
+
+        if (e.key === '5') {
+            let printer = (array) => `[${array?.join(', ')}]`
+            console.log(`Human Actions: ${printer(human.getValidActions())}`);
+            console.log(`Computer Actions: ${printer(computer.getValidActions())}`);
         }
 
         if (e.key === 'x') {
@@ -771,44 +1108,12 @@ function initListeners() {
         }
 
         if (e.key === 'd') {
-            draw(playerHand, 'false');
+            draw(humanHand, 'false');
         }
 
         if (e.key === 'e') {
             experimental.animateOverlay(center.top, 1000);
         }
-
-    });
-
-    center.element.addEventListener("drop", (event) => {
-        event.preventDefault();
-
-        let card = draggedElement;
-
-        let validRanks = currentValidRanks();
-        let rank = card.rank;
-        if (!validRanks.includes(rank)) {
-            return;
-        }
-
-        center.add(card);
-        card.flip(false);
-
-        setTimeout(() => {
-            if (rank === '10') {
-                experimental.burn(false);
-            }
-            else {
-                tools.switchPlayer(2);
-                let milliseconds = 1000;
-                tools.postpone(() => experimental.animateOverlay(card, milliseconds));
-                setTimeout(() => experimental.computerPlayRandom(), milliseconds);
-            }
-
-            update();
-
-
-        }, 50);
 
     });
 
@@ -867,6 +1172,23 @@ function updateInfo() {
         topRank = topCard.rank;
     }
 
+    let actions = human.getValidActions();
+    console.warn(actions);
+
+    let waitButton = document.getElementById('wait-button');
+    if (actions.includes('wait')) {
+        waitButton.classList.add('ok');
+    } else {
+        waitButton.classList.remove('ok');
+    }
+    
+    let pickupButton = document.getElementById('pickup-button');
+    if (actions.includes('pickup')) {
+        pickupButton.classList.add('ok');
+    } else {
+        pickupButton.classList.remove('ok');
+    }
+    
     information.innerHTML = `
         <div>Player: ${game.player}</div>
         <br>
@@ -889,13 +1211,13 @@ function updateInfo() {
  * @returns {undefined}  
  */
 function update() {
-    if (playerHand.length < 5 && deck.length > 0) {
-        draw(playerHand);
+    if (humanHand.length < 5 && deck.length > 0) {
+        draw(humanHand);
     }
     if (computerHand.length < 5 && deck.length > 0) {
         draw(computerHand, true);
     }
-    playerHand.sort();
+    humanHand.sort();
     computerHand.sort();
     updateInfo();
 }
@@ -913,27 +1235,55 @@ function main() {
     // > Generate cards and shuffle the deck
     populateDeck();
 
-    // > Trim the deck by 26 cards for testing purposes
-    for (let i = 0; i < 26; i++) {
-        let card = deck.top;
+    // > Trim the deck by N cards for testing purposes
+    let cullable = deck.cards.filter(card => !specialRanks.includes(card.rank));
+    for (let i = 0; i < 22; i++) {
+        let card = cullable[i];
         transfer(card, deck, burned);
     }
 
     // > Deal cards to player hands
-    draw(playerHand, false, 5);
+    draw(humanHand, false, 5);
     draw(computerHand, true, 5);
 
     // > Deal cards to piles on the table
-    let piles = [playerL, playerM, playerR, computerL, computerM, computerR];
+    let piles = [humanL, humanM, humanR, computerL, computerM, computerR];
     for (let pile of piles) {
         draw(pile, true);
         draw(pile);
     }
 
+    let combined = human.hand.concat(human.shown);
+    for (let card of combined) {
+        humanHand.add(card);
+    }
+    combined.sort((a, b) => startValues[ranks.indexOf(b.rank)] - startValues[ranks.indexOf(a.rank)]);
+
+    humanL.add(combined[0]);
+    humanM.add(combined[1]);
+    humanR.add(combined[2]);
+
+    combined = computer.hand.concat(computer.shown);
+    for (let card of combined) {
+        card.flip(true);
+        computerHand.add(card);
+    }
+    combined.sort((a, b) => startValues[ranks.indexOf(b.rank)] - startValues[ranks.indexOf(a.rank)]);
+    computerL.add(combined[0]);
+    combined[0].flip(false);
+    computerM.add(combined[1]);
+    combined[1].flip(false);
+    computerR.add(combined[2]);
+    combined[2].flip(false);
+
+
     // > Initialise and update information
     initListeners();
     initToolbar();
     update();
+
+    console.log(`Human: ${humanHand.cards.map(card => card.rank)}`);
+    console.log(`Computer: ${computerHand.cards.map(card => card.rank)}`);
 
 }
 
@@ -942,12 +1292,3 @@ function main() {
 // < ========================================================
 
 main();
-
-// def pile(self):
-// """Return the appropriate active list of cards"""
-//     if any(self.hand.cards):
-//         return self.hand
-//     elif any(self.shown.cards):
-//         return self.shown
-//     elif any(self.blind.cards):
-//         return self.blind

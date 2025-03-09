@@ -94,58 +94,6 @@ class PlayingCard extends HTMLElement {
     }
 
     /** 
-     * ~ Initialize event listeners  
-     * @returns {undefined}  
-     */
-    initListeners() {
-
-        // > Add right click listener to flip card
-        this.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            this.flip();
-        });
-
-        // > Add dragstart listener
-        this.addEventListener("dragstart", (event) => {
-
-            if (!experimental.specialCheck(this)) {
-                event.preventDefault();
-                return;
-            }
-
-            draggedElement = this;
-
-            let valid = tools.isValidCard(this);
-            if (valid) {
-                Overlays.apply(center.element);
-            }
-            else {
-                Overlays.apply(center.element, 'rgba(180,30,30,0.15)');
-            }
-
-            // ! EXPERIMENTAL: Fix for overlapping drag image
-            let clone = this.cloneNode(true);
-            clone.style.position = "absolute";
-            clone.style.top = "-9999px";
-            document.body.appendChild(clone);
-            event.dataTransfer.setDragImage(clone, 0, 0);
-            setTimeout(() => document.body.removeChild(clone), 0);
-
-            // ! EXPERIMENTAL: Remove card from layout
-            setTimeout(() => this.style.display = 'none', 1);
-
-        });
-
-        // > Add dragend listener
-        this.addEventListener("dragend", (event) => {
-            draggedElement = null;
-            Overlays.cleanse(center.element);
-            this.style.display = '';
-        });
-
-    }
-
-    /** 
      * ~ Callback when an observed attribute changes
      * @param {string} name
      * @param {string} oldValue
@@ -165,7 +113,6 @@ class PlayingCard extends HTMLElement {
     connectedCallback() {
         if (!this.initialised) {
             this.updateImage();
-            this.initListeners();
             this.initialised = true;
         }
     }

@@ -10,6 +10,7 @@
   <!-- ! Imports -->
   <script src='svg.js'></script>
   <script src='playing-card.js'></script>
+  <script src='player.js'></script>
 
   <!-- ! CSS -->
   <link rel="stylesheet" href="styles.css">
@@ -18,7 +19,11 @@
 
 <body>
 
-  <div id="information">
+  <div id="information"></div>
+
+  <div id="button-container">
+    <div id="pickup-button" class="button-div">Pickup</div>
+    <div id="wait-button" class="button-div">Wait</div>
   </div>
 
   <!-- ! HTML -->
@@ -44,16 +49,16 @@
       <div id="burned"></div>
     </div>
 
-    <div id="player-piles-band" class="band">
-      <div id="player-piles" class="piles">
-        <div id='player-left' class="pile"></div>
-        <div id='player-middle' class="pile"></div>
-        <div id='player-right' class="pile"></div>
+    <div id="human-piles-band" class="band">
+      <div id="human-piles" class="piles">
+        <div id='human-left' class="pile"></div>
+        <div id='human-middle' class="pile"></div>
+        <div id='human-right' class="pile"></div>
       </div>
     </div>
 
-    <div id="player-hand-band" class="band">
-      <div id="player-hand" class="hand"></div>
+    <div id="human-hand-band" class="band">
+      <div id="human-hand" class="hand"></div>
     </div>
 
   </div>
