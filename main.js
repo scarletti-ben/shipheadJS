@@ -1,6 +1,6 @@
-// < ========================================================
-// < Constants, Variables and Declarations
-// < ========================================================
+// >> ========================================================
+// >> Constants, Variables and Declarations
+// >> ========================================================
 
 let suits = ['clubs', 'diamonds', 'hearts', 'spades']
 let ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
@@ -8,150 +8,168 @@ let startValues = [30, 0, 1, 2, 3, 40, 20, 10, 60, 4, 5, 6, 50];
 let specialRanks = ['2', '7', '8', '9', '10'];
 let information = document.getElementById("information");
 
-// < ========================================================
-// < Players
-// < ========================================================
+// >> ========================================================
+// >> Game Object
+// >> ========================================================
 
-let human = new Human();
-let computer = new Computer();
-
-// < ========================================================
-// < Typed Declarations
-// < ========================================================
-
-/** @type {PlayingCard | null} */
-let draggedElement = null;
-
-/** @type {ToolbarContainer} */
-let toolbarContainer;
-
-/**
- * ~ 
- * @param {HTMLElement} element
- * @param {number} duration
- * @param {number} height
- * @returns {undefined}
+/** 
+ * ~ Game state object containing current information 
+ * @namespace game  
+ * @property {number} turn
+ * @property {number} player 
+ * @property {boolean} inert 
  */
-function changeHeight(element, duration = 1000, height = 100) {
-    const start = performance.now();
-    const step = () => {
-        const now = performance.now();
-        const delta = Math.min((now - start) / duration, 1);
-        element.style.height = (delta * height) + "%";
-        if (delta < 1) {
-            requestAnimationFrame(step);
-        }
-    };
-    step();
-}
+const game = {
+    turn: 1,
+    player: 1,
+    inert: false,
+};
 
-/**
- * ~ 
- * @param {HTMLElement} element
- * @param {number} duration
- * @param {number} height
- * @returns {undefined}
+// >> ========================================================
+// >> PlayingCard Custom HTML Element / Class
+// >> ========================================================
+
+/** 
+ * ~ Custom HTML element playing-card  
+ * @extends {HTMLElement}  
  */
-function growAndDelete(element, duration = 1000, height = 100) {
-    changeHeight(element, duration, height);
-    setTimeout(() => {
-        element.remove()
-    }, duration + 1);
-}
+class PlayingCard extends HTMLElement {
 
-class Pending {
-
-    /** @type {{ card: PlayingCard, source: Pile }[]} */
-    static data = [];
-
-    static empty() {
-        console.log('emptying pending data');
-        Pending.data = [];
-    }
-
-    static submit(card, source, duration = 1000) {
-        let playable;
-        let data = Pending.data;
-        if (data.length > 0) {
-            let rank = data[0].card.rank;
-            assert(data.every(entry => entry.card.rank === rank));
-            playable = card.rank === rank;
-        }
-        else {
-            playable = true;
-        }
-
-        let checker = tools.isValidCard(card);
-        // console.log('checker', checker)
-
-        if (playable && checker) {
-
-            let entry = { 'card': card, 'source': source };
-            data.push(entry);
-            center.add(card);
-            card.flip(false);
-            setTimeout(() => {
-                experimental.animateOverlay(card, duration)
-            }, 0);
-
-        }
-        else {
-            console.log(`${card.rank} is not playable`)
-        }
-
-    }
-
-    static process() {
-        let data = Pending.data;
-        if (!data.length > 0) {
-            console.log('Nothing to process');
-            return false;
-        }
-        // POSTIT - Current valid ranks does not care about pending
-        // Therefore you cannot add a second 10 as it is not valid
-        // And the card is essentially only checking if it can be played on itself as it becomes the anchor card
-        let ranks = currentValidRanks();
-        let issues = false;
-        for (let { card, source } of data) {
-            if (!ranks.includes(card.rank)) {
-                source.add(card);
-                issues = true;
-            }
-        }
-        if (issues) {
-            console.log('Processor met issues');
-            return
-        }
-        // console.log('Processor met no issues');
-        let rank = data[0].card.rank;
-        if (rank !== '7') {
-            game.inert = false;
+    static setDragged(card) {
+        if (Pending.accepts(card) && Game.accepts(card)) {
+            Overlays.apply(center.element);
         } else {
-            game.inert = true;
+            Overlays.apply(center.element, "rgba(180,30,30,0.15)");
         }
-
-        setTimeout(() => {
-            Pending.empty();
-            if (rank === '10') {
-                experimental.burn(false);
-            }
-            else {
-                setTimeout(() => {
-                    setTimeout(() => {
-                        tools.switchPlayer(2);
-                        experimental.computerPlayRandom();
-                    }, 0);
-                }, 0);
-            }
-            update();
-        }, 0);
-
+        this.dragged = card
     }
-}
 
-// < ========================================================
-// < Overlays Class
-// < ========================================================
+    static clearDragged() {
+        if (this.dragged) {
+            this.dragged.style.display = "";
+        }
+        this.dragged = null;
+    }
+
+    static currentID = 0;
+
+    constructor() {
+        super();
+        this.initialised = false;
+    }
+
+    /** 
+     * ~ Get attributes to observe for changes in DOM
+     * @returns {string[]}
+     */
+    static get observedAttributes() {
+        return ['rank', 'suit', 'flipped'];
+    }
+
+    /** 
+     * ~ Get the suit attribute as string
+     * @returns {string}  
+     */
+    get suit() {
+        return this.getAttribute('suit');
+    }
+
+    /** 
+     * ~ Get the rank attribute as string
+     * @returns {string}  
+     */
+    get rank() {
+        return this.getAttribute('rank');
+    }
+
+    /** 
+     * ~ Get the flipped attribute as boolean
+     * @returns {boolean}  
+     */
+    get flipped() {
+        return this.getAttribute('flipped') === 'true';
+    }
+    
+    /** 
+     * ~ Create and return a playing-card HTML element, useful as constructor does not take arguments
+     * @param {string | number} rank 
+     * @param {string} suit 
+     * @param {string} [flipped='false'] 
+     * @param {string} [draggable='true'] 
+     * @returns {PlayingCard}
+     * */
+    static create(rank, suit, flipped = 'false', draggable = 'true') {
+        let card = document.createElement('playing-card');
+        card.setAttribute('rank', String(rank).toLowerCase());
+        card.setAttribute('suit', suit.toLowerCase());
+        card.setAttribute('flipped', flipped);
+        card.setAttribute('draggable', draggable);
+        card.setAttribute('id', PlayingCard.currentID++);
+        return card;
+    }
+
+    /** 
+     * ~ Update innerHTML of this card to correct code from svgCodes
+     * @returns {undefined}
+     * */
+    updateImage() {
+        let flipped = this.getAttribute('flipped') === 'true';
+        if (flipped) {
+            let key = 'back';
+            this.innerHTML = svgCodes[key];
+        }
+        else {
+            let rank = this.rank;
+            let suit = this.getAttribute('suit');
+            if (rank && suit) {
+                let key = `${rank}_${suit}`;
+                this.innerHTML = svgCodes[key];
+            }
+        }
+    }
+
+    /** 
+     * ~ Simple method to toggle or set flip state  
+     * @param {boolean | null} flipped  
+     * @returns {undefined}  
+     */
+    flip(flipped = null) {
+        if (flipped === null) {
+            flipped = this.getAttribute('flipped') === 'true' ? false : true;
+        }
+        this.setAttribute('flipped', flipped);
+    }
+
+    /** 
+     * ~ Callback when an observed attribute changes
+     * @param {string} name
+     * @param {string} oldValue
+     * @param {string} newValue
+     * @returns {undefined}
+     */
+    attributeChangedCallback(name, oldValue, newValue) {
+        if (this.initialised && oldValue !== newValue) {
+            this.updateImage();
+        }
+    }
+
+    /**
+     * ~ Callback when the element is added to the DOM  
+     * @returns {undefined}  
+     */
+    connectedCallback() {
+        if (!this.initialised) {
+            this.updateImage();
+            this.initialised = true;
+        }
+    }
+
+}
+customElements.define('playing-card', PlayingCard);
+
+// >> ========================================================
+// >> Overlays Class
+// >> ========================================================
 
 class Overlays {
 
@@ -213,67 +231,325 @@ class Overlays {
 
 }
 
-// * ========================================================
-// * Toolbar Class
-// * ========================================================
+// >> ========================================================
+// >> VariableTimer Class
+// >> ========================================================
 
 /** 
- * ~ Custom #toolbar-container, with .toolbar-row children
+ * ~ Variable timer that can be paused / resumed and run at different speeds
  */
-class ToolbarContainer {
-    constructor() {
-        this.element = document.getElementById('toolbar-container');
+class VariableTimer {
+    /**  
+     * ~ Variable timer that can be paused / resumed and run at different speeds
+     * @param {number} [milliseconds=1000]
+     * @param {number} [speed=1]
+     * @param {number} [fps=60]
+     */
+    constructor(milliseconds = 1000, speed = 1, fps = 60) {
+        this.maximum = milliseconds;
+        this.remaining = milliseconds;
+        this.speed = speed;
+        this.fps = fps;
+        this.period = 1000 / fps;
+        this.callback = null;
+        this.interval = null;
     }
 
-    // > Add row to the toolbar
-    addRow() {
-        let row = document.createElement('div');
-        row.className = 'toolbar-row';
-        this.element.appendChild(row);
+    /** 
+     * ~ Reset the timer to its maximum duration without affecting interval
+     * @returns {undefined}
+     */
+    resetTimer() {
+        this.remaining = this.maximum;
     }
 
-    // > Create and add a button to a given row index
-    createButton(rowIndex, text, title, onClick = null) {
-        let rows = this.element.children.length;
-        if (rowIndex >= rows) {
-            let needed = rowIndex - rows;
-            for (let i = 0; i <= needed; i++) {
-                this.addRow();
+    /** 
+     * ~ 
+     * @returns {undefined}
+     */
+    restart(speed = 1, callback = null) {
+        console.log('restarted timer')
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+        this.remaining = this.maximum;
+        this.speed = speed;
+        if (callback) {
+            this.callback = callback;
+        }
+        this.interval = setInterval(() => {
+            this.tick();
+        }, this.period);
+    }
+
+    /** 
+     * ~ Clear current interval if found
+     * @returns {boolean}
+     */
+    clearInterval() {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+        this.interval = null;
+    }
+
+    /** 
+     * ~ Clear current callback
+     * @returns {undefined}
+     */
+    clearCallback() {
+        this.callback = null;
+    }
+
+    /** 
+     * ~ Run current callback
+     * @returns {undefined}
+     */
+    runCallback() {
+        if (typeof this.callback === 'function') {
+            this.callback();
+        }
+    }
+
+    /** 
+     * ~ Set the interval for the timer to tick
+     * @returns {undefined}
+     */
+    setInterval() {
+        this.interval = setInterval(() => {
+            this.tick();
+        }, this.period);
+    }
+
+    /** 
+     * ~ Reset and start the timer
+     * @returns {undefined}
+     */
+    start() {
+        this.resetTimer();
+        this.setInterval();
+    }
+
+    /** 
+     * ~ Pause the timer without resetting the remaining time
+     * @returns {undefined}
+     */
+    pause() {
+        this.clearInterval();
+    }
+
+    /** 
+     * ~ Resume the timer by creating or replacing current interval
+     * @returns {undefined}
+     */
+    resume() {
+        this.setInterval();
+    }
+
+    /** 
+     * ~ Set the speed of the timer, and continue running if needed
+     * @param {number} speed
+     * @returns {undefined}
+     */
+    setSpeed(speed) {
+        this.speed = speed;
+        if (this.interval) {
+            this.resume();
+        }
+    }
+
+    /** 
+     * ~ Reduce the time on the timer by the speed value
+     * @returns {undefined}
+     */
+    tick() {
+        this.remaining -= this.period * this.speed;
+        if (this.remaining <= 0) {
+            this.clearInterval();
+            this.runCallback();
+            this.clearCallback();
+        }
+    }
+
+    get running() {
+        return this.interval !== null;
+    }
+
+    get ended() {
+        return this.interval === null;
+    }
+
+}
+
+// >> ========================================================
+// >> Pending Class
+// >> ========================================================
+
+class Pending {
+
+    /** @type {{ card: PlayingCard, source: Pile }[]} */
+    static data = [];
+
+    static duration = 1000;
+
+    /** @type {VariableTimer} */
+    static timer = new VariableTimer(Pending.duration, 1);
+
+    static accepts(card) {
+        if (Pending.data.length < 1) {
+            return true;
+        }
+        let rank = Pending.data[0].card.rank;
+        return card.rank === rank;
+    }
+
+    /** 
+     * ~ Text
+     * @param {PlayingCard} card
+     * @param {number} duration
+     * @returns {undefined}
+     */
+    static submit(card) {
+
+
+        // POSTIT - Hasmore check is broken for table piles as it cares about cards below not across and so timer gives info about your hidden card
+        let source = quick.cardToPile(card);
+
+        let submittedRank = card.rank;
+        let hasMore = source.cards.filter(card => card.rank === submittedRank).length > 1;
+        let speed = hasMore ? 0.4 : 1
+        console.log(`Speed: ${speed}`)
+
+        let entry = { 'card': card, 'source': source };
+        Pending.data.push(entry);
+        center.add(card);
+        card.flip(false);
+
+        tools.animateOverlay(card, Pending.duration / speed);
+
+        Pending.timer.restart(speed, () => Pending.process());
+
+    }
+
+    static process() {
+        let data = Pending.data;
+        let rank = data[0].card.rank;
+        let validRanks = currentValidRanks();
+
+        let player = null;
+        for (let { card, source } of data) {
+            if (!validRanks.includes(card.rank)) {
+                player = quick.pileToPlayer(source);
+                break;
             }
         }
-        const row = this.element.children[rowIndex];
-        let button = document.createElement('div');
-        button.className = 'toolbar-button';
-        button.title = title;
-        button.textContent = text;
-        if (onClick) {
-            button.addEventListener('click', (e) => {
-                onClick(e);
-            });
+        if (player) {
+            player.pickup()
         }
-        row.appendChild(button);
+
+        Pending.empty();
+
+        if (rank !== '7') {
+            game.inert = false;
+        } else {
+            game.inert = true;
+        }
+
+        /**
+         * ~ Checks if the last four cards in a given array are the same rank
+         * @param {PlayingCard[]} cards
+         * @returns {boolean}
+         */
+        function fourInARowPlain(cards) {
+            let four = cards.slice(-4);
+            if (four.length < 4) {
+                return false;
+            }
+            let rank = four[0].rank;
+            let same = four.every(card => card.rank === rank);
+            return same;
+        }
+
+        let fourInARow = fourInARowPlain(center.cards) || fourInARowPlain(center.cards.filter(card => card.rank !== '7'));
+
+        if (fourInARow || rank === '10') {
+            tools.burn(false);
+        }
+        else {
+            tools.switchPlayer(2);
+            update();
+            setTimeout(() => {
+                computer.act();
+                update();
+            }, 200);
+        }
     }
+
+    static empty() {
+        console.log('emptying pending data');
+        Pending.data = [];
+    }
+
 }
 
 // < ========================================================
-// < HTML Wrapper Classes
+// < Wrapper Parent Class
 // < ========================================================
 
 /** 
- * ~ Represents a wrapper for a pile of playing-card elements
- */
-class Pile {
+ * ~ Wrapper class parent for classes with this.element attribute
+*/
+class Wrapper {
 
-    /**  
-     * ~ Creates a pile wrapper for the HTML container with the given ID  
-     * @param {string} id
-     * @returns {PlayingCard}
-     */
+    /** @type {HTMLElement} */
+    element;
+
+    /** @type {Wrapper[]} */
+    static objects = [];
+
     constructor(id) {
         this.element = document.getElementById(id);
-        if (!this.element) {
-            console.log(id);
+        this.constructor.objects.push(this);
+    }
+
+    static instanceCheck(obj) {
+        if (this !== Wrapper) {
+            throw new Error('instanceCheck should only be called from Wrapper class');
         }
+        return obj instanceof this;
+    }
+}
+
+// >> ========================================================
+// >> Pile (Wrapper) Class
+// >> ========================================================
+
+/** 
+ * ~ Pile wrapper for container of playing-card elements
+ */
+class Pile extends Wrapper {
+
+    /** @type {Pile[]} */
+    static objects = [];
+
+    /**  
+     * ~ 
+     * @returns {PlayingCard[]}
+     */
+    get cards() {
+        let nodes = this.element.querySelectorAll('playing-card');
+        let output = Array.from(nodes);
+        return output;
+    }
+
+    get cardsReversed() {
+        let cards = this.cards;
+        cards.reverse();
+        return cards;
+    }
+
+    includes(card) {
+        return this.cards.includes(card);
     }
 
     /** 
@@ -298,10 +574,8 @@ class Pile {
      * @returns {PlayingCard | undefined}  
      */
     get top() {
-        if (this.length > 0) {
-            const card = this.cards[this.length - 1];
-            return card;
-        }
+        let elements = this.element.querySelectorAll('playing-card');
+        return elements[elements.length - 1];
     }
 
     /** 
@@ -312,6 +586,14 @@ class Pile {
     remove(card) {
         if (card && this.element.contains(card)) {
             this.element.removeChild(card);
+        }
+    }
+
+    shuffle() {
+        let cards = this.cards;
+        tools.shuffle(cards);
+        for (let card of cards) {
+            this.add(card);
         }
     }
 
@@ -330,85 +612,294 @@ class Pile {
     }
 
     /** 
-     * ~ Pop a card from the top of this pile  
-     * @returns {PlayingCard | undefined}  
-     */
-    pop() {
-        const card = this.top;
-        if (card) {
-            this.element.removeChild(card);
-            return card;
-        }
-    }
-
-    /** 
      * ~ Add a card to the top of this pile  
      * @param {PlayingCard} card  
      * @returns {undefined}  
      */
-    add(card) {
+    add(card, flipped = null) {
+        if (flipped !== null) {
+            card.flip(flipped);
+        }
         this.element.appendChild(card);
     }
-}
 
-// < ========================================================
-// < HTML Wrapper Objects
-// < ========================================================
-
-let deck = new Pile('deck');
-let center = new Pile('center');
-let burned = new Pile('burned');
-let humanHand = new Pile('human-hand');
-let humanL = new Pile('human-left');
-let humanM = new Pile('human-middle');
-let humanR = new Pile('human-right');
-let computerHand = new Pile('computer-hand');
-let computerL = new Pile('computer-left');
-let computerM = new Pile('computer-middle');
-let computerR = new Pile('computer-right');
-
-// < ========================================================
-// < Game Object
-// < ========================================================
-
-/** 
- * ~ Game state object containing current information 
- * @namespace game  
- * @property {number} turn
- * @property {number} player 
- * @property {boolean} inert 
- */
-const game = {
-    turn: 1,
-    player: 1,
-    inert: false,
-};
-
-// < ========================================================
-// < Utility Functions
-// < ========================================================
-
-/**  
- * > Prevents the default action of an event  
- * @param {Event} event - The event to nullify  
- * @returns {null}  
- */
-function nullify(event) {
-    event.preventDefault();
-}
-
-/** 
- * ~ Get the remaining number of items in an array or HTMLElement  
- * @param {Array | HTMLElement} object
- * @returns {number}  
- */
-function remaining(object) {
-    if (Array.isArray(object)) {
-        return object.length;
-    } else if (object instanceof HTMLElement) {
-        return object.children.length;
+    populate(shuffled = true, flipped = true) {
+        for (let suit of suits) {
+            for (let rank of ranks) {
+                let card = PlayingCard.create(rank, suit, flipped);
+                this.add(card);
+            }
+        }
+        if (shuffled) {
+            this.shuffle();
+        }
     }
-    return 0;
+
+    /**  
+     * ~ 
+     * @param {Pile} destination
+     * @param {number} n
+     * @param {boolean} flipped
+     */
+    popTo(destination, n = 1, flipped = false) {
+        for (let i = 0; i < n; i++) {
+            if (this.cards.length > 0) {
+                let card = this.top;
+                destination.add(card, flipped);
+            }
+        }
+    }
+}
+
+// >> ========================================================
+// >> Player Class and Subclasses
+// >> ========================================================
+
+class Player {
+
+    /** @type {Player[]} */
+    static objects = [];
+
+    constructor(nickname, value, secret) {
+        this.nickname = nickname;
+        this.value = value;
+        this.secret = secret;
+        this.hand = new Pile(`${this.nickname}-hand`);
+        this.left = new Pile(`${this.nickname}-left`);
+        this.middle = new Pile(`${this.nickname}-middle`);
+        this.right = new Pile(`${this.nickname}-right`);
+        Player.objects.push(this);
+    }
+
+    wait() {
+        game.inert = true;
+        tools.switchPlayer();
+    }
+
+    get piles() {
+        return [this.hand, this.left, this.middle, this.right];
+    }
+
+    pickup(switching = true) {
+        transferAll(center, this.hand, this.secret);
+        if (switching) {
+            tools.switchPlayer();
+        }
+    }
+
+    /** 
+     * ~
+     * @returns {Pile[]}  
+     */
+    get tablePiles() {
+        return [this.left, this.middle, this.right];
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard[]}  
+     */
+    get shown() {
+        return this.table.filter(card => !card.flipped);
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard[]}  
+     */
+    get hidden() {
+        return this.table.filter(card => card.flipped);
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard[]}  
+     */
+    get handCards() {
+        return this.hand.cards;
+    }
+
+    hasWon() {
+        return this.elligibleCards.length === 0;
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard[]}  
+     */
+    get tableCards() {
+        let output = []
+        for (let pile of this.tablePiles) {
+            output = output.concat(pile.cards);
+        }
+        return output
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard[]}  
+     */
+    get shownCards() {
+        return this.tableCards.filter(card => !card.flipped)
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard[]}  
+     */
+    get hiddenCards() {
+        return this.tableCards.filter(card => card.flipped)
+    }
+
+    // /** 
+    //  * ~
+    //  * @returns {PlayingCard[]}  
+    //  */
+    // get hand() {
+    //     let element = document.getElementById(`${this.name}-hand`);
+    //     let nodes = element.querySelectorAll('playing-card');
+    //     let cards = Array.from(nodes);
+    //     return cards;
+    // }
+
+    get elligibleCards() {
+        if (this.hand.length > 0) {
+            return this.hand.cards;
+        }
+        else if (this.tableCards.length > 0) {
+            if (this.shownCards.length > 0) {
+                return this.shownCards;
+            }
+            return this.hiddenCards;
+        }
+        else {
+            return [];
+        }
+    }
+
+    get isCurrentPlayer() {
+        return game.player === this.value;
+    }
+
+    notice(text) {
+        return;
+        console.log(`${this.nickname}: ${text}`)
+    }
+
+    draw(n = 1, flipped = false) {
+        for (let i = 0; i < n; i++) {
+            let card = deck.top;
+            this.hand.add(card, flipped);
+        }
+    }
+
+    /** 
+     * ~ 
+     * @returns {boolean}
+     */
+    canPlay() {
+        if (!this.isCurrentPlayer) {
+            this.notice('Not current player');
+            return false;
+        }
+        let elligibleCards = this.elligibleCards;
+        if (elligibleCards.length < 1) {
+            this.notice('No elligible cards');
+            return false;
+        }
+        let ranks = currentValidRanks();
+        let validCards = elligibleCards.filter(card => ranks.includes(card.rank));
+        if (validCards.length < 1) {
+            this.notice('No valid cards');
+            return false;
+        }
+        return true;
+    }
+
+    getValidActions() {
+        let actions = [];
+        if (this.canPlay()) {
+            actions.push('play');
+        }
+        if (center.cards.length < 1) {
+            return actions;
+        }
+        let rank = getAnchorRank();
+        if (game.inert || rank !== '8') {
+            actions.push('pickup');
+        } else {
+            actions.push('wait');
+        }
+        return actions;
+    }
+
+}
+
+class Human extends Player {
+    constructor() {
+        super('human', 1, false)
+    }
+}
+
+class Computer extends Player {
+    constructor() {
+        super('computer', 2, true)
+    }
+
+    act() {
+        update();
+        if (!this.isCurrentPlayer) {
+            console.log("It is not the computer's turn")
+            return;
+        }
+
+        let eight = getAnchorCard()?.rank === '8';
+
+        let activeCards = getActiveCards();
+        let cards = activeCards.filter(card => Game.accepts(card));
+
+        if (cards.length > 0) {
+            let ranks = cards.map(card => card.rank);
+            let rank = tools.choice(ranks);
+            let selected = cards.filter(card => card.rank === rank);
+            for (let card of selected) {
+                center.add(card);
+                card.flip(false);
+            }
+            if (rank === '10') {
+                transferAll(center, burned);
+                // showToast('Computer burned the deck, delaying 1000ms', 3000);
+                setTimeout(() => {
+                    this.act();
+                }, 1000);
+                return;
+            } else if (rank !== '7') {
+                game.inert = false;
+            } else {
+                game.inert = true;
+            }
+        } else if (eight) {
+            tools.waitEight();
+        } else {
+            console.log('Picking up', 'hand is', computer.hand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
+            transferAll(center, computer.hand, true);
+        }
+
+        tools.switchPlayer();
+        setTimeout(() => {
+            update();
+        }, 0);
+
+    }
+
+}
+
+// ! ========================================================
+// ! Useful Functions
+// ! ========================================================
+
+function range(func, n = 1) {
+    Array.from({ length: n}).forEach(func)
 }
 
 /**
@@ -440,436 +931,6 @@ function transferAll(source, destination, flipped = 'false') {
         destination.add(source.element.firstChild);
     }
 }
-
-/**
- * ~ Transfer a card from the deck to a given container
- * @param {Pile} destination
- * @returns {undefined}
- */
-function draw(destination, flipped = false, n = 1) {
-    for (let i = 0; i < n; i++) {
-        let cards = deck.cards;
-        if (cards.length > 0) {
-            let card = deck.pop();
-            card.flip(flipped);
-            deck.remove(card);
-            destination.add(card);
-        }
-    }
-}
-
-/** 
- * ~ Populate deck pile with playing-card elements and shuffle
- * @returns {undefined}  
- */
-function populateDeck() {
-    let pack = [];
-    for (let suit of suits) {
-        for (let rank of ranks) {
-            let card = PlayingCard.create(rank, suit);
-            pack.push(card);
-        }
-    }
-    tools.shuffle(pack);
-    for (let [i, card] of pack.entries()) {
-        card.id = `playing-card-${i}`;
-        card.flip();
-        deck.add(card);
-    }
-}
-
-// ! ========================================================
-// ! Experimental Object
-// ! ========================================================
-
-/** 
- * ! Experimental functions grouped into an object  
- * @namespace experimental  
- */
-const experimental = {
-
-    // getValidActions() {
-    //     let actions = [];
-    //     let rank = getAnchorRank();
-    //     if (rank === '8') {
-    //         actions.push('wait');
-    //     } else {
-    //         actions.push('pickup');
-    //     }
-    //     if (this.canPlay()) {
-    //         actions.push('play');
-    //     }
-    //     return actions;
-    // },
-
-    computerPlayRandom() {
-        update();
-        if (game.player !== 2) {
-            console.log("It is not the computer's turn")
-            return;
-        }
-
-        let eight = getAnchorCard()?.rank === '8';
-
-        let active = experimental.activePile();
-        let cards = active.filter(card => tools.isValidCard(card));
-
-        if (cards.length > 0) {
-            let ranks = cards.map(card => card.rank);
-            let rank = tools.choice(ranks);
-            let selected = cards.filter(card => card.rank === rank);
-            for (let card of selected) {
-                center.add(card);
-                card.flip(false);
-            }
-            if (rank === '10') {
-                transferAll(center, burned);
-                console.log('Computer played 10, delaying 1000ms')
-                setTimeout(() => {
-                    experimental.computerPlayRandom();
-                }, 1000);
-                return;
-            } else if (rank !== '7') {
-                game.inert = false;
-            } else {
-                game.inert = true;
-            }
-        } else if (eight) {
-            experimental.waitEight();
-        } else {
-            console.warn('Picking up', 'hand is', computerHand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
-            transferAll(center, computerHand, true);
-        }
-
-        game.player = 1;
-        setTimeout(() => {
-            update();
-        }, 0);
-
-    },
-
-    burn(switching = true) {
-        transferAll(center, burned, false);
-        if (switching) {
-            tools.switchPlayer();
-        }
-    },
-
-    pickup(switching = true) {
-        let pile = game.player === 1 ? humanHand : computerHand;
-        let flipped = game.player === 1 ? false : true
-        transferAll(center, pile, flipped);
-        if (switching) {
-            tools.switchPlayer();
-        }
-    },
-
-    cleanup(event) {
-        if (event.propertyName == 'opacity') {
-            void this.offsetHeight;
-            this.style.opacity = '0'
-            this.removeEventListener('transitionend', experimental.cleanup);
-        }
-    },
-
-    /** 
-     * ~ Text
-     * @param {HTMLElement} element
-     * @returns {undefined}
-     */
-    animateOverlay(element, duration = 1000) {
-        const overlay = document.createElement('div');
-        Object.assign(overlay.style, {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '0%',
-            backgroundColor: 'rgba(128, 0, 128, 0.5)',
-        });
-        element.appendChild(overlay);
-        growAndDelete(overlay, duration);
-    },
-
-    /** 
-     * ~ Check if a card is in the active pile
-     * @param {PlayingCard} _card
-     * @returns {boolean}
-     */
-    specialCheck(_card) {
-        let array;
-        if (game.player === 1) {
-            if (humanHand.cards.length > 0) {
-                array = humanHand.cards;
-            }
-            else {
-                let cards = [...humanL.cards, ...humanM.cards, ...humanR.cards]
-                let shown = cards.filter(card => !card.flipped);
-                let hidden = cards.filter(card => card.flipped);
-                if (shown.length > 0) {
-                    array = shown;
-                }
-                else if (hidden.length > 0) {
-                    array = hidden;
-                }
-                else {
-                    alert(`Player ${game.player} has won`)
-                }
-            }
-        } else if (game.player === 2) {
-            if (computerHand.cards.length > 0) {
-                array = computerHand.cards;
-            } else {
-                let cards = [...computerL.cards, ...computerM.cards, ...computerR.cards];
-                let shown = cards.filter(card => !card.flipped);
-                let hidden = cards.filter(card => card.flipped);
-                if (shown.length > 0) {
-                    array = shown;
-                } else if (hidden.length > 0) {
-                    array = hidden;
-                } else {
-                    alert(`Player ${game.player} has won`);
-                }
-            }
-        }
-        if (array && array.length > 0) {
-            return array.includes(_card);
-        }
-        return false;
-    },
-
-    /** 
-     * ~ Get the active pile
-     * @returns {PlayingCard[]}
-     */
-    activePile() {
-        let array;
-        if (game.player === 1) {
-            if (humanHand.cards.length > 0) {
-                array = humanHand.cards;
-            }
-            else {
-                let cards = [...humanL.cards, ...humanM.cards, ...humanR.cards]
-                let shown = cards.filter(card => !card.flipped);
-                let hidden = cards.filter(card => card.flipped);
-                if (shown.length > 0) {
-                    array = shown;
-                }
-                else if (hidden.length > 0) {
-                    array = hidden;
-                }
-                else {
-                    alert(`Player ${game.player} has won`)
-                }
-            }
-        } else if (game.player === 2) {
-            if (computerHand.cards.length > 0) {
-                array = computerHand.cards;
-            } else {
-                let cards = [...computerL.cards, ...computerM.cards, ...computerR.cards];
-                let shown = cards.filter(card => !card.flipped);
-                let hidden = cards.filter(card => card.flipped);
-                if (shown.length > 0) {
-                    array = shown;
-                } else if (hidden.length > 0) {
-                    array = hidden;
-                } else {
-                    alert(`Player ${game.player} has won`);
-                }
-            }
-        }
-        return array;
-    },
-
-    showValid() {
-        let cards = document.querySelectorAll('playing-card');
-        for (let card of cards) {
-            let playable = experimental.specialCheck(card);
-            let valid = tools.isValidCard(card);
-            if (playable && valid) {
-                Overlays.temporary(card, 1500, 'rgba(0, 200, 128, 0.4)')
-            }
-        }
-    },
-
-    waitEight() {
-        game.inert = true;
-        tools.switchPlayer();
-    },
-
-};
-
-/**  
- * ~ Assert that a condition is true, throwing an error if false  
- * @param {boolean} condition  
- * @param {string} message
- * @returns {undefined}
- * @throws {Error} If the condition is false  
- */
-function assert(condition, message = "Assertion failed") {
-    if (!condition) {
-        throw new Error(message);
-    }
-}
-
-// < ========================================================
-// < Tools Object
-// < ========================================================
-
-/** 
- * ~ Utility functions grouped into an object  
- * @namespace tools  
- */
-const tools = {
-
-    /** 
-     * ~ Swtich to the next player, or a given player number
-     * @param {number | null} [n=null]
-     * @returns {undefined}
-     */
-    switchPlayer(n = null) {
-        if (n !== null) {
-            game.player = n;
-        }
-        else {
-            game.player = (game.player % 2) + 1;
-        }
-        update();
-    },
-
-    /** 
-     * ~ Get the length of a given object  
-     * @param {HTMLElement | Pile | PlayingCard[]} object - The object to check  
-     * @returns {number} - The length of the object  
-     * @throws {Error} If the object is not a valid type  
-     */
-    length(object) {
-        if (object instanceof Pile) {
-            return object.length;
-        } else if (object instanceof HTMLElement) {
-            return object.children.length;
-        } else if (Array.isArray(object)) {
-            return object.length;
-        }
-        throw new Error('UserWarning');
-    },
-
-    /** 
-     * ~ Get the cards from a given object  
-     * @param {HTMLElement | Pile | PlayingCard[]} object 
-     * @returns {PlayingCard[]}
-     * @throws {Error} If the object is not a valid type
-     */
-    cards(object) {
-        if (object instanceof Pile) {
-            return object.cards;
-        } else if (object instanceof HTMLElement) {
-            return Array.from(object.children);
-        } else if (Array.isArray(object)) {
-            return object;
-        }
-        throw new Error('UserWarning');
-    },
-
-    /** 
-     * ~ Get playing-card element by id
-     * @param {string} id
-     * @returns {PlayingCard}
-     */
-    getCard(id) {
-        let card = document.getElementById(id);
-        return card;
-    },
-
-    /** 
-     * ~ Check if an element is an instance of PlayingCard  
-     * @param {HTMLElement} element - The element to check  
-     * @throws {Error} If the element is not an instance of PlayingCard
-     * @returns {undefined}  
-     */
-    cardCheck(element) {
-        if (!(element instanceof PlayingCard)) {
-            throw new Error("Element is not <playing-card>")
-        }
-    },
-
-    /** 
-     * ~ Get a random element from an array
-     * @param {Array} array
-     * @returns {*} A random element from the array
-     */
-    choice(array) {
-        return array[Math.floor(Math.random() * array.length)];
-    },
-
-    /** 
-     * ~ Check if a card is currently valid to play
-     * @param {PlayingCard} card
-     * @returns {boolean}
-     */
-    isValidCard(card) {
-        let validRanks = currentValidRanks();
-        let rank = card.rank;
-        return validRanks.includes(rank);
-    },
-
-    /** 
-     * ~ Toggle visibility for an element via .hidden class
-     * @param {HTMLElement} element
-     * @returns {undefined}
-     */
-    toggle(element) {
-        element.classList.toggle('hidden');
-    },
-
-    /** 
-     * ~ Toggle visibility of information window
-     * @returns {undefined}
-     */
-    toggleInformation() {
-        tools.toggle(information);
-    },
-
-    /**
-     * ~ Checks if an element allows for relative or absolute positioned children
-     * @param {HTMLElement} element
-     * @returns {boolean}
-     */
-    allowsPositionedChildren(element) {
-        const position = getComputedStyle(element).position;
-        return position !== 'static';
-    },
-
-    /**
-     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
-     * @param {Function} callback
-     * @returns {undefined}
-     */
-    postpone(callback) {
-        setTimeout(callback, 0);
-    },
-
-    /** 
-     * ~ Shuffle an array in place  
-     * @param {Array} array - The array to shuffle  
-     * @returns {undefined}  
-     */
-    shuffle(array) {
-        let currentIndex = array.length;
-        while (currentIndex != 0) {
-            let randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex--;
-            [array[currentIndex], array[randomIndex]] = [
-                array[randomIndex], array[currentIndex]];
-        }
-    },
-
-
-};
-
-// ! ========================================================
-// ! Python Translations
-// ! ========================================================
 
 /** 
  * ~ Get list of the valid ranks that can play on a card rank  
@@ -932,6 +993,311 @@ function currentValidRanks() {
     return validRanks;
 }
 
+/**
+ * ~ 
+ * @param {HTMLElement} element
+ * @param {number} duration
+ * @param {number} height
+ * @returns {undefined}
+ */
+function changeHeight(element, duration = 1000, height = 100) {
+    const start = performance.now();
+    const step = () => {
+        const now = performance.now();
+        const delta = Math.min((now - start) / duration, 1);
+        element.style.height = (delta * height) + "%";
+        if (delta < 1) {
+            requestAnimationFrame(step);
+        }
+    };
+    step();
+}
+
+/**
+ * ~ 
+ * @param {HTMLElement} element
+ * @param {number} duration
+ * @param {number} height
+ * @returns {undefined}
+ */
+function growAndDelete(element, duration = 1000, height = 100) {
+    changeHeight(element, duration, height);
+    setTimeout(() => {
+        element.remove()
+    }, duration + 1);
+}
+
+class Game {
+    static accepts(card) {
+        // console.log('NotImplemented Game.accepts');
+        return isValidCard(card); 
+    }
+}
+
+/** 
+ * ~ Update the text in #information based on current game state
+ * @returns {undefined}
+ */
+function updateInfo() {
+
+    let validRanks = currentValidRanks();
+
+    let anchorCard = getAnchorCard();
+    let anchorRank = 'N/A';
+    if (anchorCard) {
+        anchorRank = anchorCard.rank;
+    }
+
+    let topCard = center.top;
+    let topRank = 'N/A';
+    if (topCard) {
+        topRank = topCard.rank;
+    }
+
+    let actions = human.getValidActions();
+
+    // showToast(`Valid Human Actions: ${actions.join(', ')}`);
+
+    let waitButton = document.getElementById('wait-button');
+    if (actions.includes('wait')) {
+        waitButton.classList.add('ok');
+    } else {
+        waitButton.classList.remove('ok');
+    }
+
+    let pickupButton = document.getElementById('pickup-button');
+    if (actions.includes('pickup')) {
+        pickupButton.classList.add('ok');
+    } else {
+        pickupButton.classList.remove('ok');
+    }
+
+    information.innerHTML = `
+        <div>Player: ${game.player}</div>
+        <br>
+        <div>Inert: ${game.inert}</div>
+        <div>Top Card: ${topRank}</div>
+        <br>
+        <div>Valid: ${validRanks.join(' ')}</div>
+        <br>
+        <div>Anchor Rank: ${anchorRank}</div>
+        <br>
+        <div>Cards in Deck: ${deck.length}</div>
+        <div>Cards in Center: ${center.length}</div>
+        <div>Cards in Burned: ${burned.length}</div>
+        <div>Total Cards: ${document.querySelectorAll('playing-card').length}</div>
+    `;
+}
+
+/** 
+ * ~ Update function to be called at an interval, drawing cards and sorting hands  
+ * @returns {undefined}  
+ */
+function update() {
+    for (let player of [human, computer]) {
+        if (player.hasWon()) {
+            alert(`${player.nickname} has won`)
+            return;
+        }
+        if (player.hand.length < 5 && deck.length > 0) {
+            let quantity = 5 - player.hand.length;
+            deck.popTo(player.hand, quantity, player.secret)
+        }
+    }
+    human.hand.sort();
+    computer.hand.sort();
+    updateInfo();
+}
+
+/** 
+ * ~ Utility functions grouped into an object  
+ * @namespace tools  
+ */
+const tools = {
+
+    /** 
+     * ~ Swtich to the next player, or a given player number
+     * @param {number | null} [n=null]
+     * @returns {undefined}
+     */
+    switchPlayer(n = null) {
+        if (n !== null) {
+            game.player = n;
+        }
+        else {
+            game.player = (game.player % 2) + 1;
+        }
+        update();
+    },
+
+    /** 
+     * ~ Get the length of a given object  
+     * @param {HTMLElement | Pile | PlayingCard[]} object - The object to check  
+     * @returns {number} - The length of the object  
+     * @throws {Error} If the object is not a valid type  
+     */
+    length(object) {
+        if (object instanceof Pile) {
+            return object.length;
+        } else if (object instanceof HTMLElement) {
+            return object.children.length;
+        } else if (Array.isArray(object)) {
+            return object.length;
+        }
+        throw new Error('UserError');
+    },
+
+    /** 
+     * ~ Get the cards from a given object  
+     * @param {HTMLElement | Pile | PlayingCard[]} object 
+     * @returns {PlayingCard[]}
+     * @throws {Error} If the object is not a valid type
+     */
+    cards(object) {
+        if (object instanceof Pile) {
+            return object.cards;
+        } else if (object instanceof HTMLElement) {
+            return Array.from(object.children);
+        } else if (Array.isArray(object)) {
+            return object;
+        }
+        throw new Error('UserError');
+    },
+
+    /** 
+     * ~ Get playing-card element by id
+     * @param {string} id
+     * @returns {PlayingCard}
+     */
+    getCard(id) {
+        let card = document.getElementById(id);
+        return card;
+    },
+
+    /** 
+     * ~ Check if an element is an instance of PlayingCard  
+     * @param {HTMLElement} element - The element to check  
+     * @throws {Error} If the element is not an instance of PlayingCard
+     * @returns {undefined}  
+     */
+    cardCheck(element) {
+        if (!(element instanceof PlayingCard)) {
+            throw new Error("Element is not <playing-card>")
+        }
+    },
+
+    /** 
+     * ~ Get a random element from an array
+     * @param {Array} array
+     * @returns {*} A random element from the array
+     */
+    choice(array) {
+        return array[Math.floor(Math.random() * array.length)];
+    },
+
+    /** 
+     * ~ Toggle visibility for an element via .hidden class
+     * @param {HTMLElement} element
+     * @returns {undefined}
+     */
+    toggle(element) {
+        element.classList.toggle('hidden');
+    },
+
+    /** 
+     * ~ Toggle visibility of information window
+     * @returns {undefined}
+     */
+    toggleInformation() {
+        tools.toggle(information);
+    },
+
+    /**
+     * ~ Checks if an element allows for relative or absolute positioned children
+     * @param {HTMLElement} element
+     * @returns {boolean}
+     */
+    allowsPositionedChildren(element) {
+        const position = getComputedStyle(element).position;
+        return position !== 'static';
+    },
+
+    /**
+     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
+     * @param {Function} callback
+     * @returns {undefined}
+     */
+    postpone(callback) {
+        setTimeout(callback, 0);
+    },
+
+    /** 
+     * ~ Shuffle an array in place  
+     * @param {Array} array - The array to shuffle  
+     * @returns {undefined}  
+     */
+    shuffle(array) {
+        let currentIndex = array.length;
+        while (currentIndex != 0) {
+            let randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+    },
+
+    burn(switching = true) {
+        transferAll(center, burned, false);
+        if (switching) {
+            tools.switchPlayer();
+        }
+    },
+
+    pickup(switching = true) {
+        let pile = game.player === 1 ? human.hand : computer.hand;
+        let flipped = game.player === 1 ? false : true
+        transferAll(center, pile, flipped);
+        if (switching) {
+            tools.switchPlayer();
+        }
+    },
+
+    cleanup(event) {
+        if (event.propertyName == 'opacity') {
+            void this.offsetHeight;
+            this.style.opacity = '0'
+            this.removeEventListener('transitionend', tools.cleanup);
+        }
+    },
+
+    /** 
+     * ~ Text
+     * @param {HTMLElement} element
+     * @returns {undefined}
+     */
+    animateOverlay(element, duration = 1000) {
+        const overlay = document.createElement('div');
+        // overlay.classList.add('overlay');
+        Object.assign(overlay.style, {
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '0%',
+            backgroundColor: 'rgba(128, 0, 128, 0.5)',
+        });
+        element.appendChild(overlay);
+        growAndDelete(overlay, duration);
+    },
+
+    waitEight() {
+        game.inert = true;
+        tools.switchPlayer();
+    },
+
+
+};
+
 /** 
  * ~ Get the first card from the center cards that is not a '7'  
  * @returns {PlayingCard | undefined} The first card not of rank '7', or undefined if none found  
@@ -955,340 +1321,309 @@ function getAnchorRank() {
     return card?.rank;
 }
 
-// < ========================================================
-// < Initialisation Functions
-// < ========================================================
-
 /** 
- * ~ Initialise event listeners for the document  
- * @returns {null}  
+ * ~ Get list of the valid ranks that can play on the top center card
+ * @returns {Array<number | string>}
  */
-function initListeners() {
-
-    let wait = document.getElementById('wait-button');
-    wait.onclick = () => {
-        let actions = human.getValidActions();
-        if (actions.includes('wait')) {
-            experimental.waitEight();
-            experimental.computerPlayRandom();
-        }
+function currentValidRanks() {
+    let validRanks = ranks;
+    let card = getAnchorCard();
+    if (card) {
+        let rank = card.rank;
+        validRanks = getValidRanks(rank);
     }
-
-    let pickup = document.getElementById('pickup-button');
-    pickup.onclick = () => {
-        let actions = human.getValidActions();
-        if (actions.includes('pickup')) {
-            experimental.pickup(true);
-            setTimeout(() => {
-                experimental.computerPlayRandom();
-            }, 500);
-        }
-    }
-
-    // ! ========================================================
-    // ! Drag and Drop Methods
-    // ! ========================================================
-
-    document.addEventListener("dragstart", (event) => {
-
-        let card = event.target.closest("playing-card");
-        if (!card) {
-            return;
-        }
-
-        if (!human.canPlay()) {
-            console.log('Human cannot drag this, and cannot play');
-            // event.preventDefault();
-            // return;
-        }
-
-        let elligibleCards = human.elligibleCards;
-        if (!elligibleCards.includes(card)) {
-            console.log('Human cannot drag this, but can play');
-            event.preventDefault();
-            return;
-        }
-
-        draggedElement = card;
-
-        let valid = tools.isValidCard(card);
-        if (valid) {
-            Overlays.apply(center.element);
-        } else {
-            Overlays.apply(center.element, "rgba(180,30,30,0.15)");
-        }
-
-        let clone = card.cloneNode(true);
-        clone.style.position = "absolute";
-        clone.style.top = "-9999px";
-        document.body.appendChild(clone);
-        event.dataTransfer.setDragImage(clone, 0, 0);
-        setTimeout(() => document.body.removeChild(clone), 0);
-
-        setTimeout(() => card.style.display = "none", 1);
-
-    });
-
-    center.element.addEventListener("drop", (event) => {
-        event.preventDefault();
-        let card = draggedElement;
-        let duration = 1000;
-        let pending = Pending.data.length > 0;
-        Pending.submit(card, humanHand, duration);
-        if (!pending) {
-            setTimeout(() => {
-                Pending.process();
-            }, duration);
-        }
-        else {
-            console.log('card pending already, implement timer reset and variable speed')
-        }
-    });
-
-    document.addEventListener("dragend", (event) => {
-        if (draggedElement) {
-            Overlays.cleanse(center.element);
-            draggedElement.style.display = "";
-            draggedElement = null;
-        }
-    });
-
-    // ! ========================================================
-
-    // > Hide the drag not allowed cursor
-    document.addEventListener("dragover", (event) => {
-        event.preventDefault();
-    });
-
-    // > Hide the drag not allowed cursor
-    document.addEventListener("dragenter", (event) => {
-        event.preventDefault();
-    });
-
-    // > Handle keyboard key presses
-    document.addEventListener("keydown", (e) => {
-
-        if (e.key === ' ') {
-            experimental.pickup(true);
-            setTimeout(() => {
-                experimental.computerPlayRandom();
-            }, 500);
-        }
-
-        if (e.key === 's') {
-            tools.switchPlayer();
-        }
-
-        if (e.key === '8') {
-            experimental.waitEight();
-            experimental.computerPlayRandom();
-        }
-
-        if (e.key === 't') {
-            let x = getAnchorCard(center, humanHand);
-            console.log(x)
-        }
-
-        if (e.key === '5') {
-            let printer = (array) => `[${array?.join(', ')}]`
-            console.log(`Human Actions: ${printer(human.getValidActions())}`);
-            console.log(`Computer Actions: ${printer(computer.getValidActions())}`);
-        }
-
-        if (e.key === 'x') {
-            experimental.showValid();
-        }
-
-        if (e.key === 'b') {
-            transferAll(center, burned);
-        }
-
-        if (e.key === 'r') {
-            experimental.computerPlayRandom();
-        }
-
-        if (e.key === 'd') {
-            draw(humanHand, 'false');
-        }
-
-        if (e.key === 'e') {
-            experimental.animateOverlay(center.top, 1000);
-        }
-
-    });
-
+    return validRanks;
 }
 
 /** 
- * ~ Initialise the toolbarContainer and add buttons
- * @returns {null}  
- */
-function initToolbar() {
-    toolbarContainer = new ToolbarContainer();
-    toolbarContainer.createButton(0, "-", "", null);
-    toolbarContainer.createButton(1, "R", "computerPlayRandom", () => experimental.computerPlayRandom());
-    toolbarContainer.createButton(2, "P", "pickup", () => experimental.pickup());
-    toolbarContainer.createButton(3, "S", "nextPlayer", () => {
-        tools.switchPlayer();
-        experimental.computerPlayRandom();
-    });
-    toolbarContainer.createButton(4, "B", "burnCenter", () => experimental.burn());
-    toolbarContainer.createButton(5, "I", "toggleInformation", () => tools.toggleInformation());
-}
-
-/** 
- * ~ Initialise callback intervals for the document  
- * @returns {null}  
- */
-function initIntervals() {
-
-    setInterval(() => {
-        update();
-    }, 1000);
-
-}
-
-// < ========================================================
-// < Update Functions
-// < ========================================================
-
-/** 
- * ~ Update the text in #information based on current game state
+ * ~
+ * @param {Player} player
  * @returns {undefined}
  */
-function updateInfo() {
-
-    let validRanks = currentValidRanks();
-
-    let anchorCard = getAnchorCard();
-    let anchorRank = 'N/A';
-    if (anchorCard) {
-        anchorRank = anchorCard.rank;
+function distributeStartingCards(player) {
+    deck.popTo(player.hand, 5, player.secret);
+    for (let pile of player.tablePiles) {
+        deck.popTo(pile, 1, true);
+        deck.popTo(pile, 1, false);
     }
-
-    let topCard = center.top;
-    let topRank = 'N/A';
-    if (topCard) {
-        topRank = topCard.rank;
-    }
-
-    let actions = human.getValidActions();
-    console.warn(actions);
-
-    let waitButton = document.getElementById('wait-button');
-    if (actions.includes('wait')) {
-        waitButton.classList.add('ok');
-    } else {
-        waitButton.classList.remove('ok');
-    }
-    
-    let pickupButton = document.getElementById('pickup-button');
-    if (actions.includes('pickup')) {
-        pickupButton.classList.add('ok');
-    } else {
-        pickupButton.classList.remove('ok');
-    }
-    
-    information.innerHTML = `
-        <div>Player: ${game.player}</div>
-        <br>
-        <div>Inert: ${game.inert}</div>
-        <div>Top Card: ${topRank}</div>
-        <br>
-        <div>Valid: ${validRanks.join(' ')}</div>
-        <br>
-        <div>Anchor Rank: ${anchorRank}</div>
-        <br>
-        <div>Cards in Deck: ${deck.length}</div>
-        <div>Cards in Center: ${center.length}</div>
-        <div>Cards in Burned: ${burned.length}</div>
-        <div>Total Cards: ${document.querySelectorAll('playing-card').length}</div>
-    `;
 }
 
 /** 
- * ~ Update function to be called at an interval, drawing cards and sorting hands  
- * @returns {undefined}  
+ * ~ Text
+ * @param {Player} player
+ * @returns {undefined}
  */
-function update() {
-    if (humanHand.length < 5 && deck.length > 0) {
-        draw(humanHand);
+function pickBestShownCards(player) {
+    let cards = [...player.handCards, ...player.shownCards];
+    for (let card of cards) {
+        player.hand.add(card, player.secret);
     }
-    if (computerHand.length < 5 && deck.length > 0) {
-        draw(computerHand, true);
-    }
-    humanHand.sort();
-    computerHand.sort();
-    updateInfo();
+    sort(cards, (card) => quick.cardToStartValue(card), true);
+    player.left.add(cards[0], false);
+    player.middle.add(cards[1], false);
+    player.right.add(cards[2], false);
 }
 
-// < ========================================================
-// < Entry Point Function
-// < ========================================================
+function getActiveCards() {
+    let array;
+    let player = game.player === 1 ? human : computer;
+    if (player.hand.cards.length > 0) {
+        array = player.hand.cards;
+    }
+    else {
+        let shown = player.shownCards;
+        let hidden = player.hiddenCards;
+        if (shown.length > 0) {
+            array = shown;
+        }
+        else if (hidden.length > 0) {
+            array = hidden;
+        }
+        else {
+            alert(`Player ${game.player} has won`)
+        }
+    }
+    return array;
+}
+
+class quick {
+    
+    static cardToPile(card) {
+        let piles = Pile.objects;
+        for (let pile of piles) {
+            if (pile.includes(card)) {
+                return pile;
+            }
+        }
+    }
+
+    static cardToStartValue(card) {
+        let rankIndex = ranks.indexOf(card.rank);
+        let startValue = startValues[rankIndex]
+        return startValue;
+    }
+
+    static pileToPlayer(pile) {
+        let players = Player.objects;
+        for (let player of players) {
+            if (player.piles.includes(pile)) {
+                return player;
+            }
+        }
+    }
+
+    static elementToPile(element) {
+        let piles = Pile.objects;
+        for (let pile of piles) {
+            if (pile.element === element) {
+                return pile;
+            }
+        }
+    }
+
+    static numberToPlayer(value) {
+        let players = Player.objects;
+        for (let player of players) {
+            if (player.value === value) {
+                return player;
+            }
+        }
+    }
+
+    static idToCard(id) {
+        let card = document.getElementById(id);
+        return card;
+    }
+}
+
+/**
+ * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
+ * @param {Function} callback
+ * @returns {undefined}
+ */
+function postpone(callback) {
+    setTimeout(callback, 0);
+}
+
+/**
+ * ~ Sorts an array based on a provided key function, with an optional reverse order
+ * @param {Array} array
+ * @param {Function} key
+ * @param {boolean} reverse
+ * @returns {Array}
+ */
+function sort(array, key, reverse = false) {
+    return array.sort((a, b) => {
+        const comparison = key(a) - key(b);
+        return reverse ? -comparison : comparison;
+    });
+}
+
+const buttons = {
+    wait: document.getElementById('wait-button'),
+    pickup: document.getElementById('pickup-button'),
+}
+
+class check {
+
+    asserting = false;
+
+    /**  
+     * ~ Assert that a condition is true, throwing an error if false  
+     * @param {boolean} condition
+     * @param {string} message
+     * @throws {Error} If the condition is false
+     */
+    constructor(condition, message) {
+        if (!condition) {
+            if (this.asserting) {
+                throw new Error(message);
+            }
+            return false;
+
+        }
+        return true;
+    }
+}
+class assert extends check {
+    asserting = true;
+}
+
+function isValidCard(card) {
+    let validRanks = currentValidRanks();
+    let rank = card.rank;
+    return validRanks.includes(rank);
+}
+
+// > ========================================================
+// > Event Handler Helper Functions
+// > ========================================================
+
+function setDragged(event, card) {
+    let clone = card.cloneNode(true);
+    clone.style.position = "absolute";
+    clone.style.top = "-9999px";
+    document.body.appendChild(clone);
+    event.dataTransfer.setDragImage(clone, 0, 0);
+    PlayingCard.setDragged(card);
+    postpone(() => clone.remove());
+    postpone(() => card.style.display = "none");
+}
+
+function clearDragged() {
+    PlayingCard.clearDragged();
+}
+
+// >> ========================================================
+// >> Event Handler Functions
+// >> ========================================================
+
+/** 
+ * ~
+ * @param {Event} event
+ * @returns {undefined}
+ */
+function dragstartHandler(event) {
+    console.log('dragstart')
+    let card = event.target.closest("playing-card");
+    if (!card) {
+        event.preventDefault();
+        return;
+    }
+    let activeCards = getActiveCards();
+    if (!activeCards.includes(card)) {
+        event.preventDefault();
+        return;
+    }
+    setDragged(event, card);
+}
+
+/** 
+ * ~
+ * @param {Event} event
+ * @returns {undefined}
+ */
+function dropHandler(event) {
+    event.preventDefault();
+    let card = PlayingCard.dragged;
+    if (card.flipped || Pending.accepts(card) && Game.accepts(card)) {
+        Pending.submit(card);
+    }
+}
+
+/** 
+ * ~
+ * @param {Event} event
+ * @returns {undefined}
+ */
+function dragendHandler(event) {
+    Overlays.cleanse(center.element);
+    PlayingCard.clearDragged();
+}
+
+/** 
+ * ~
+ * @param {Event} event
+ * @returns {undefined}
+ */
+function keydownHandler(event) {}
+
+// >> ========================================================
+// >> Core Object Initialisations
+// >> ========================================================
+
+let deck = new Pile('deck');
+let center = new Pile('center');
+let burned = new Pile('burned');
+let human = new Human();
+let computer = new Computer();
+
+// >> ========================================================
+// >> Entry Point Function
+// >> ========================================================
 
 /** 
  * ~ Entry point of the application
  * @returns {undefined}  
  */
 function main() {
+    deck.populate(true, true);
+    range(() => deck.top.remove(), 26)
 
-    // > Generate cards and shuffle the deck
-    populateDeck();
+    distributeStartingCards(human);
+    distributeStartingCards(computer);
+    pickBestShownCards(human);
+    pickBestShownCards(computer);
+    document.addEventListener("dragstart", dragstartHandler);
+    center.element.addEventListener("drop", dropHandler);
+    document.addEventListener("dragend", dragendHandler);
+    document.addEventListener("dragover", (event) => event.preventDefault());
+    document.addEventListener("dragenter", (event) => event.preventDefault());
+    document.addEventListener("keydown", keydownHandler);
 
-    // > Trim the deck by N cards for testing purposes
-    let cullable = deck.cards.filter(card => !specialRanks.includes(card.rank));
-    for (let i = 0; i < 22; i++) {
-        let card = cullable[i];
-        transfer(card, deck, burned);
+    buttons.wait.onclick = () => {
+        let actions = human.getValidActions();
+        if (actions.includes('wait')) {
+            human.wait();
+            computer.act();
+        }
     }
 
-    // > Deal cards to player hands
-    draw(humanHand, false, 5);
-    draw(computerHand, true, 5);
-
-    // > Deal cards to piles on the table
-    let piles = [humanL, humanM, humanR, computerL, computerM, computerR];
-    for (let pile of piles) {
-        draw(pile, true);
-        draw(pile);
+    buttons.pickup.onclick = () => {
+        let actions = human.getValidActions();
+        if (actions.includes('pickup')) {
+            human.pickup(true);
+            setTimeout(() => {
+                computer.act();
+            }, 500);
+        }
     }
 
-    let combined = human.hand.concat(human.shown);
-    for (let card of combined) {
-        humanHand.add(card);
-    }
-    combined.sort((a, b) => startValues[ranks.indexOf(b.rank)] - startValues[ranks.indexOf(a.rank)]);
-
-    humanL.add(combined[0]);
-    humanM.add(combined[1]);
-    humanR.add(combined[2]);
-
-    combined = computer.hand.concat(computer.shown);
-    for (let card of combined) {
-        card.flip(true);
-        computerHand.add(card);
-    }
-    combined.sort((a, b) => startValues[ranks.indexOf(b.rank)] - startValues[ranks.indexOf(a.rank)]);
-    computerL.add(combined[0]);
-    combined[0].flip(false);
-    computerM.add(combined[1]);
-    combined[1].flip(false);
-    computerR.add(combined[2]);
-    combined[2].flip(false);
-
-
-    // > Initialise and update information
-    initListeners();
-    initToolbar();
     update();
+};
 
-    console.log(`Human: ${humanHand.cards.map(card => card.rank)}`);
-    console.log(`Computer: ${computerHand.cards.map(card => card.rank)}`);
-
-}
-
-// < ========================================================
-// < Execution
-// < ========================================================
+// >> ========================================================
+// >> Execution
+// >> ========================================================
 
 main();
