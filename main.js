@@ -12,18 +12,24 @@ let information = document.getElementById("information");
 // >> Game Object
 // >> ========================================================
 
-/** 
- * ~ Game state object containing current information 
- * @namespace game  
- * @property {number} turn
- * @property {number} player 
- * @property {boolean} inert 
- */
-const game = {
-    turn: 1,
-    player: 1,
-    inert: false,
-};
+class Game {
+    static turn = 1
+    static player = 1
+    static inert = false
+
+    static accepts(card) {
+        return isValidCard(card);
+    }
+}
+
+// >> ========================================================
+// >> Buttons Object
+// >> ========================================================
+
+const buttons = {
+    wait: document.getElementById('wait-button'),
+    pickup: document.getElementById('pickup-button'),
+}
 
 // >> ========================================================
 // >> PlayingCard Custom HTML Element / Class
@@ -46,7 +52,7 @@ class PlayingCard extends HTMLElement {
 
     static clearDragged() {
         if (this.dragged) {
-            this.dragged.style.display = "";
+            toggleHidden(this.dragged, false);
         }
         this.dragged = null;
     }
@@ -89,7 +95,7 @@ class PlayingCard extends HTMLElement {
     get flipped() {
         return this.getAttribute('flipped') === 'true';
     }
-    
+
     /** 
      * ~ Create and return a playing-card HTML element, useful as constructor does not take arguments
      * @param {string | number} rank 
@@ -215,19 +221,19 @@ class Overlays {
         }
     }
 
-    /** 
-     * ~ Adds an overlay to an element, with timeout to remove it
-     * @param {HTMLElement} element
-     * @param {number} milliseconds
-     * @param {string} color
-     * @returns {undefined}  
-     */
-    static temporary(element, milliseconds = 1000, color = 'rgba(0, 180, 120, 0.15)') {
-        Overlays.apply(element, color);
-        setTimeout(() => {
-            Overlays.cleanse(element);
-        }, milliseconds);
-    }
+    // /** 
+    //  * ~ Adds an overlay to an element, with timeout to remove it
+    //  * @param {HTMLElement} element
+    //  * @param {number} milliseconds
+    //  * @param {string} color
+    //  * @returns {undefined}  
+    //  */
+    // static temporary(element, milliseconds = 1000, color = 'rgba(0, 180, 120, 0.15)') {
+    //     Overlays.apply(element, color);
+    //     setTimeout(() => {
+    //         Overlays.cleanse(element);
+    //     }, milliseconds);
+    // }
 
 }
 
@@ -371,13 +377,13 @@ class VariableTimer {
         }
     }
 
-    get running() {
-        return this.interval !== null;
-    }
+    // get running() {
+    //     return this.interval !== null;
+    // }
 
-    get ended() {
-        return this.interval === null;
-    }
+    // get ended() {
+    //     return this.interval === null;
+    // }
 
 }
 
@@ -390,7 +396,9 @@ class Pending {
     /** @type {{ card: PlayingCard, source: Pile }[]} */
     static data = [];
 
-    static duration = 1000;
+    static duration = 800;
+    static slower = 0.2;
+    static faster = 1;
 
     /** @type {VariableTimer} */
     static timer = new VariableTimer(Pending.duration, 1);
@@ -411,13 +419,12 @@ class Pending {
      */
     static submit(card) {
 
-
         // POSTIT - Hasmore check is broken for table piles as it cares about cards below not across and so timer gives info about your hidden card
         let source = quick.cardToPile(card);
 
         let submittedRank = card.rank;
         let hasMore = source.cards.filter(card => card.rank === submittedRank).length > 1;
-        let speed = hasMore ? 0.4 : 1
+        let speed = hasMore ? Pending.slower : Pending.faster
         console.log(`Speed: ${speed}`)
 
         let entry = { 'card': card, 'source': source };
@@ -425,7 +432,7 @@ class Pending {
         center.add(card);
         card.flip(false);
 
-        tools.animateOverlay(card, Pending.duration / speed);
+        animateOverlay(card, Pending.duration / speed);
 
         Pending.timer.restart(speed, () => Pending.process());
 
@@ -450,9 +457,9 @@ class Pending {
         Pending.empty();
 
         if (rank !== '7') {
-            game.inert = false;
+            Game.inert = false;
         } else {
-            game.inert = true;
+            Game.inert = true;
         }
 
         /**
@@ -473,10 +480,10 @@ class Pending {
         let fourInARow = fourInARowPlain(center.cards) || fourInARowPlain(center.cards.filter(card => card.rank !== '7'));
 
         if (fourInARow || rank === '10') {
-            tools.burn(false);
+            burn(false);
         }
         else {
-            tools.switchPlayer(2);
+            switchPlayer(2);
             update();
             setTimeout(() => {
                 computer.act();
@@ -591,7 +598,7 @@ class Pile extends Wrapper {
 
     shuffle() {
         let cards = this.cards;
-        tools.shuffle(cards);
+        utils.shuffle(cards);
         for (let card of cards) {
             this.add(card);
         }
@@ -672,8 +679,8 @@ class Player {
     }
 
     wait() {
-        game.inert = true;
-        tools.switchPlayer();
+        Game.inert = true;
+        switchPlayer();
     }
 
     get piles() {
@@ -683,7 +690,7 @@ class Player {
     pickup(switching = true) {
         transferAll(center, this.hand, this.secret);
         if (switching) {
-            tools.switchPlayer();
+            switchPlayer();
         }
     }
 
@@ -695,21 +702,21 @@ class Player {
         return [this.left, this.middle, this.right];
     }
 
-    /** 
-     * ~
-     * @returns {PlayingCard[]}  
-     */
-    get shown() {
-        return this.table.filter(card => !card.flipped);
-    }
+    // /** 
+    //  * ~
+    //  * @returns {PlayingCard[]}  
+    //  */
+    // get shown() {
+    //     return this.table.filter(card => !card.flipped);
+    // }
 
-    /** 
-     * ~
-     * @returns {PlayingCard[]}  
-     */
-    get hidden() {
-        return this.table.filter(card => card.flipped);
-    }
+    // /** 
+    //  * ~
+    //  * @returns {PlayingCard[]}  
+    //  */
+    // get hidden() {
+    //     return this.table.filter(card => card.flipped);
+    // }
 
     /** 
      * ~
@@ -778,7 +785,7 @@ class Player {
     }
 
     get isCurrentPlayer() {
-        return game.player === this.value;
+        return Game.player === this.value;
     }
 
     notice(text) {
@@ -786,12 +793,12 @@ class Player {
         console.log(`${this.nickname}: ${text}`)
     }
 
-    draw(n = 1, flipped = false) {
-        for (let i = 0; i < n; i++) {
-            let card = deck.top;
-            this.hand.add(card, flipped);
-        }
-    }
+    // draw(n = 1, flipped = false) {
+    //     for (let i = 0; i < n; i++) {
+    //         let card = deck.top;
+    //         this.hand.add(card, flipped);
+    //     }
+    // }
 
     /** 
      * ~ 
@@ -825,7 +832,7 @@ class Player {
             return actions;
         }
         let rank = getAnchorRank();
-        if (game.inert || rank !== '8') {
+        if (Game.inert || rank !== '8') {
             actions.push('pickup');
         } else {
             actions.push('wait');
@@ -854,13 +861,13 @@ class Computer extends Player {
         }
 
         let eight = getAnchorCard()?.rank === '8';
+        // POSTIT - Seems to be a bug with computer and 8s
 
         let activeCards = getActiveCards();
         let cards = activeCards.filter(card => Game.accepts(card));
-
         if (cards.length > 0) {
             let ranks = cards.map(card => card.rank);
-            let rank = tools.choice(ranks);
+            let rank = utils.choice(ranks);
             let selected = cards.filter(card => card.rank === rank);
             for (let card of selected) {
                 center.add(card);
@@ -874,18 +881,18 @@ class Computer extends Player {
                 }, 1000);
                 return;
             } else if (rank !== '7') {
-                game.inert = false;
+                Game.inert = false;
             } else {
-                game.inert = true;
+                Game.inert = true;
             }
         } else if (eight) {
-            tools.waitEight();
+            this.wait();
         } else {
             console.log('Picking up', 'hand is', computer.hand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
             transferAll(center, computer.hand, true);
         }
 
-        tools.switchPlayer();
+        switchPlayer();
         setTimeout(() => {
             update();
         }, 0);
@@ -894,28 +901,89 @@ class Computer extends Player {
 
 }
 
-// ! ========================================================
-// ! Useful Functions
-// ! ========================================================
+// >> ========================================================
+// >> Utils Class
+// >> ========================================================
 
-function range(func, n = 1) {
-    Array.from({ length: n}).forEach(func)
+class utils {
+    /**
+     * ~ Sorts an array based on a provided key function, with an optional reverse order
+     * @param {Array} array
+     * @param {Function} key
+     * @param {boolean} reverse
+     * @returns {Array}
+     */
+    static sort(array, key, reverse = false) {
+        return array.sort((a, b) => {
+            const comparison = key(a) - key(b);
+            return reverse ? -comparison : comparison;
+        });
+    }
+
+    /** 
+     * ~ Get a random element from an array
+     * @param {Array} array
+     * @returns {*} A random element from the array
+     */
+    static choice(array) {
+        return array[Math.floor(Math.random() * array.length)];
+    }
+
+    /** 
+     * ~ Shuffle an array in place  
+     * @param {Array} array - The array to shuffle  
+     * @returns {undefined}  
+     */
+    static shuffle(array) {
+        let currentIndex = array.length;
+        while (currentIndex != 0) {
+            let randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+    }
+
+    static range(func, n = 1) {
+        Array.from({ length: n }).forEach(func);
+    }
+
+    /**
+     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
+     * @param {Function} callback
+     * @returns {undefined}
+     */
+    static postpone(callback) {
+        setTimeout(callback, 0);
+    }
 }
 
-/**
- * ~ Transfer a given card from one container to another
- * @param {PlayingCard} card
- * @param {Pile} source
- * @param {Pile} destination
+// ! ========================================================
+// ! Other Functions
+// ! ========================================================
+
+/** 
+ * ~ Toggle visibility for an element via .hidden class
+ * @param {HTMLElement} element
  * @returns {undefined}
  */
-function transfer(card, source, destination, flipped = false) {
-    let cards = source.cards;
-    if (cards.includes(card)) {
-        source.remove(card);
-        destination.add(card);
-        card.flip(flipped);
+function toggleHidden(element, hidden = null) {
+    element.classList.toggle('hidden', hidden);
+}
+
+/** 
+ * ~ Swtich to the next player, or a given player number
+ * @param {number | null} [n=null]
+ * @returns {undefined}
+ */
+function switchPlayer(n = null) {
+    if (n !== null) {
+        Game.player = n;
     }
+    else {
+        Game.player = (Game.player % 2) + 1;
+    }
+    update();
 }
 
 /**
@@ -952,14 +1020,14 @@ function getValidRanks(rank) {
     } else if (rank === '7') {
         valid = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
     } else if (rank === '8') {
-        if (game.inert) {
+        if (Game.inert) {
             valid = ['2', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
         }
         else {
             valid = ['8'];
         }
     } else if (rank === '9') {
-        if (game.inert) {
+        if (Game.inert) {
             valid = ['2', '7', '9', '10', 'jack', 'queen', 'king', 'ace'];
         } else {
             valid = ['2', '3', '4', '5', '6', '7', '8', '9'];
@@ -991,47 +1059,6 @@ function currentValidRanks() {
         validRanks = getValidRanks(rank);
     }
     return validRanks;
-}
-
-/**
- * ~ 
- * @param {HTMLElement} element
- * @param {number} duration
- * @param {number} height
- * @returns {undefined}
- */
-function changeHeight(element, duration = 1000, height = 100) {
-    const start = performance.now();
-    const step = () => {
-        const now = performance.now();
-        const delta = Math.min((now - start) / duration, 1);
-        element.style.height = (delta * height) + "%";
-        if (delta < 1) {
-            requestAnimationFrame(step);
-        }
-    };
-    step();
-}
-
-/**
- * ~ 
- * @param {HTMLElement} element
- * @param {number} duration
- * @param {number} height
- * @returns {undefined}
- */
-function growAndDelete(element, duration = 1000, height = 100) {
-    changeHeight(element, duration, height);
-    setTimeout(() => {
-        element.remove()
-    }, duration + 1);
-}
-
-class Game {
-    static accepts(card) {
-        // console.log('NotImplemented Game.accepts');
-        return isValidCard(card); 
-    }
 }
 
 /** 
@@ -1073,9 +1100,9 @@ function updateInfo() {
     }
 
     information.innerHTML = `
-        <div>Player: ${game.player}</div>
+        <div>Player: ${Game.player}</div>
         <br>
-        <div>Inert: ${game.inert}</div>
+        <div>Inert: ${Game.inert}</div>
         <div>Top Card: ${topRank}</div>
         <br>
         <div>Valid: ${validRanks.join(' ')}</div>
@@ -1109,194 +1136,12 @@ function update() {
     updateInfo();
 }
 
-/** 
- * ~ Utility functions grouped into an object  
- * @namespace tools  
- */
-const tools = {
-
-    /** 
-     * ~ Swtich to the next player, or a given player number
-     * @param {number | null} [n=null]
-     * @returns {undefined}
-     */
-    switchPlayer(n = null) {
-        if (n !== null) {
-            game.player = n;
-        }
-        else {
-            game.player = (game.player % 2) + 1;
-        }
-        update();
-    },
-
-    /** 
-     * ~ Get the length of a given object  
-     * @param {HTMLElement | Pile | PlayingCard[]} object - The object to check  
-     * @returns {number} - The length of the object  
-     * @throws {Error} If the object is not a valid type  
-     */
-    length(object) {
-        if (object instanceof Pile) {
-            return object.length;
-        } else if (object instanceof HTMLElement) {
-            return object.children.length;
-        } else if (Array.isArray(object)) {
-            return object.length;
-        }
-        throw new Error('UserError');
-    },
-
-    /** 
-     * ~ Get the cards from a given object  
-     * @param {HTMLElement | Pile | PlayingCard[]} object 
-     * @returns {PlayingCard[]}
-     * @throws {Error} If the object is not a valid type
-     */
-    cards(object) {
-        if (object instanceof Pile) {
-            return object.cards;
-        } else if (object instanceof HTMLElement) {
-            return Array.from(object.children);
-        } else if (Array.isArray(object)) {
-            return object;
-        }
-        throw new Error('UserError');
-    },
-
-    /** 
-     * ~ Get playing-card element by id
-     * @param {string} id
-     * @returns {PlayingCard}
-     */
-    getCard(id) {
-        let card = document.getElementById(id);
-        return card;
-    },
-
-    /** 
-     * ~ Check if an element is an instance of PlayingCard  
-     * @param {HTMLElement} element - The element to check  
-     * @throws {Error} If the element is not an instance of PlayingCard
-     * @returns {undefined}  
-     */
-    cardCheck(element) {
-        if (!(element instanceof PlayingCard)) {
-            throw new Error("Element is not <playing-card>")
-        }
-    },
-
-    /** 
-     * ~ Get a random element from an array
-     * @param {Array} array
-     * @returns {*} A random element from the array
-     */
-    choice(array) {
-        return array[Math.floor(Math.random() * array.length)];
-    },
-
-    /** 
-     * ~ Toggle visibility for an element via .hidden class
-     * @param {HTMLElement} element
-     * @returns {undefined}
-     */
-    toggle(element) {
-        element.classList.toggle('hidden');
-    },
-
-    /** 
-     * ~ Toggle visibility of information window
-     * @returns {undefined}
-     */
-    toggleInformation() {
-        tools.toggle(information);
-    },
-
-    /**
-     * ~ Checks if an element allows for relative or absolute positioned children
-     * @param {HTMLElement} element
-     * @returns {boolean}
-     */
-    allowsPositionedChildren(element) {
-        const position = getComputedStyle(element).position;
-        return position !== 'static';
-    },
-
-    /**
-     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
-     * @param {Function} callback
-     * @returns {undefined}
-     */
-    postpone(callback) {
-        setTimeout(callback, 0);
-    },
-
-    /** 
-     * ~ Shuffle an array in place  
-     * @param {Array} array - The array to shuffle  
-     * @returns {undefined}  
-     */
-    shuffle(array) {
-        let currentIndex = array.length;
-        while (currentIndex != 0) {
-            let randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex--;
-            [array[currentIndex], array[randomIndex]] = [
-                array[randomIndex], array[currentIndex]];
-        }
-    },
-
-    burn(switching = true) {
-        transferAll(center, burned, false);
-        if (switching) {
-            tools.switchPlayer();
-        }
-    },
-
-    pickup(switching = true) {
-        let pile = game.player === 1 ? human.hand : computer.hand;
-        let flipped = game.player === 1 ? false : true
-        transferAll(center, pile, flipped);
-        if (switching) {
-            tools.switchPlayer();
-        }
-    },
-
-    cleanup(event) {
-        if (event.propertyName == 'opacity') {
-            void this.offsetHeight;
-            this.style.opacity = '0'
-            this.removeEventListener('transitionend', tools.cleanup);
-        }
-    },
-
-    /** 
-     * ~ Text
-     * @param {HTMLElement} element
-     * @returns {undefined}
-     */
-    animateOverlay(element, duration = 1000) {
-        const overlay = document.createElement('div');
-        // overlay.classList.add('overlay');
-        Object.assign(overlay.style, {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '0%',
-            backgroundColor: 'rgba(128, 0, 128, 0.5)',
-        });
-        element.appendChild(overlay);
-        growAndDelete(overlay, duration);
-    },
-
-    waitEight() {
-        game.inert = true;
-        tools.switchPlayer();
-    },
-
-
-};
+function burn(switching = true) {
+    transferAll(center, burned, false);
+    if (switching) {
+        switchPlayer();
+    }
+}
 
 /** 
  * ~ Get the first card from the center cards that is not a '7'  
@@ -1358,7 +1203,7 @@ function pickBestShownCards(player) {
     for (let card of cards) {
         player.hand.add(card, player.secret);
     }
-    sort(cards, (card) => quick.cardToStartValue(card), true);
+    utils.sort(cards, (card) => quick.cardToStartValue(card), true);
     player.left.add(cards[0], false);
     player.middle.add(cards[1], false);
     player.right.add(cards[2], false);
@@ -1366,7 +1211,7 @@ function pickBestShownCards(player) {
 
 function getActiveCards() {
     let array;
-    let player = game.player === 1 ? human : computer;
+    let player = Game.player === 1 ? human : computer;
     if (player.hand.cards.length > 0) {
         array = player.hand.cards;
     }
@@ -1380,14 +1225,24 @@ function getActiveCards() {
             array = hidden;
         }
         else {
-            alert(`Player ${game.player} has won`)
+            alert(`Player ${Game.player} has won`)
         }
     }
     return array;
 }
 
+function isValidCard(card) {
+    let validRanks = currentValidRanks();
+    let rank = card.rank;
+    return validRanks.includes(rank);
+}
+
+// >> ========================================================
+// >> Quick Object
+// >> ========================================================
+
 class quick {
-    
+
     static cardToPile(card) {
         let piles = Pile.objects;
         for (let pile of piles) {
@@ -1436,63 +1291,62 @@ class quick {
     }
 }
 
+// -- ========================================================
+// -- Animation Functions
+// -- ========================================================
+
 /**
- * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
- * @param {Function} callback
+ * ~ 
+ * @param {HTMLElement} element
+ * @param {number} duration
+ * @param {number} height
  * @returns {undefined}
  */
-function postpone(callback) {
-    setTimeout(callback, 0);
+function changeHeight(element, duration = 1000, height = 100) {
+    const start = performance.now();
+    const step = () => {
+        const now = performance.now();
+        const delta = Math.min((now - start) / duration, 1);
+        element.style.height = (delta * height) + "%";
+        if (delta < 1) {
+            requestAnimationFrame(step);
+        }
+    };
+    step();
 }
 
 /**
- * ~ Sorts an array based on a provided key function, with an optional reverse order
- * @param {Array} array
- * @param {Function} key
- * @param {boolean} reverse
- * @returns {Array}
+ * ~ 
+ * @param {HTMLElement} element
+ * @param {number} duration
+ * @param {number} height
+ * @returns {undefined}
  */
-function sort(array, key, reverse = false) {
-    return array.sort((a, b) => {
-        const comparison = key(a) - key(b);
-        return reverse ? -comparison : comparison;
+function growAndDelete(element, duration = 1000, height = 100) {
+    changeHeight(element, duration, height);
+    setTimeout(() => {
+        element.remove()
+    }, duration + 1);
+}
+
+/** 
+ * ~ Text
+ * @param {HTMLElement} element
+ * @returns {undefined}
+ */
+function animateOverlay(element, duration = 1000) {
+    const overlay = document.createElement('div');
+    // overlay.classList.add('overlay');
+    Object.assign(overlay.style, {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '0%',
+        backgroundColor: 'rgba(128, 0, 128, 0.5)',
     });
-}
-
-const buttons = {
-    wait: document.getElementById('wait-button'),
-    pickup: document.getElementById('pickup-button'),
-}
-
-class check {
-
-    asserting = false;
-
-    /**  
-     * ~ Assert that a condition is true, throwing an error if false  
-     * @param {boolean} condition
-     * @param {string} message
-     * @throws {Error} If the condition is false
-     */
-    constructor(condition, message) {
-        if (!condition) {
-            if (this.asserting) {
-                throw new Error(message);
-            }
-            return false;
-
-        }
-        return true;
-    }
-}
-class assert extends check {
-    asserting = true;
-}
-
-function isValidCard(card) {
-    let validRanks = currentValidRanks();
-    let rank = card.rank;
-    return validRanks.includes(rank);
+    element.appendChild(overlay);
+    growAndDelete(overlay, duration);
 }
 
 // > ========================================================
@@ -1506,8 +1360,8 @@ function setDragged(event, card) {
     document.body.appendChild(clone);
     event.dataTransfer.setDragImage(clone, 0, 0);
     PlayingCard.setDragged(card);
-    postpone(() => clone.remove());
-    postpone(() => card.style.display = "none");
+    utils.postpone(() => clone.remove());
+    utils.postpone(() => toggleHidden(card, true));
 }
 
 function clearDragged() {
@@ -1566,7 +1420,7 @@ function dragendHandler(event) {
  * @param {Event} event
  * @returns {undefined}
  */
-function keydownHandler(event) {}
+function keydownHandler(event) { }
 
 // >> ========================================================
 // >> Core Object Initialisations
@@ -1588,7 +1442,7 @@ let computer = new Computer();
  */
 function main() {
     deck.populate(true, true);
-    range(() => deck.top.remove(), 26)
+    utils.range(() => deck.top.remove(), 26)
 
     distributeStartingCards(human);
     distributeStartingCards(computer);
