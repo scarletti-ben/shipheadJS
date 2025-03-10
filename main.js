@@ -9,6 +9,80 @@ let specialRanks = ['2', '7', '8', '9', '10'];
 let information = document.getElementById("information");
 
 // >> ========================================================
+// >> Utils Class
+// >> ========================================================
+
+class utils {
+    /**
+     * ~ Sorts an array based on a provided key function, with an optional reverse order
+     * @param {Array} array
+     * @param {Function} key
+     * @param {boolean} reverse
+     * @returns {Array}
+     */
+    static sort(array, key, reverse = false) {
+        return array.sort((a, b) => {
+            const comparison = key(a) - key(b);
+            return reverse ? -comparison : comparison;
+        });
+    }
+
+    /** 
+     * ~ Get a random element from an array
+     * @param {Array} array
+     * @returns {*} A random element from the array
+     */
+    static choice(array) {
+        return array[Math.floor(Math.random() * array.length)];
+    }
+
+    /** 
+     * ~ Shuffle an array in place  
+     * @param {Array} array - The array to shuffle  
+     * @returns {undefined}  
+     */
+    static shuffle(array) {
+        let currentIndex = array.length;
+        while (currentIndex != 0) {
+            let randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+    }
+
+    static range(func, n = 1) {
+        Array.from({ length: n }).forEach(func);
+    }
+
+    /**
+     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
+     * @param {Function} callback
+     * @returns {undefined}
+     */
+    static postpone(callback) {
+        setTimeout(callback, 0);
+    }
+
+    /** 
+     * ~ Toggle visibility for an element via .hidden class
+     * @param {HTMLElement} element
+     * @returns {undefined}
+     */
+    static toggleHidden(element, hidden = null) {
+        element.classList.toggle('hidden', hidden);
+    }
+
+    static assert(condition, message) {
+        if (!condition) {
+            throw new Error(`UserError: ${message}`);
+        }
+        return true;
+    }
+
+}
+
+// >> ========================================================
 // >> Game Object
 // >> ========================================================
 
@@ -23,12 +97,33 @@ class Game {
 }
 
 // >> ========================================================
-// >> Buttons Object
+// >> Buttons Class
 // >> ========================================================
 
-const buttons = {
-    wait: document.getElementById('wait-button'),
-    pickup: document.getElementById('pickup-button'),
+class Buttons {
+    static wait = document.getElementById('wait-button');
+    static pickup = document.getElementById('pickup-button');
+
+    static init() {
+        this.wait.onclick = () => {
+            let actions = human.getValidActions();
+            if (actions.includes('wait')) {
+                human.wait(true);
+                computer.act();
+            }
+        }
+
+        this.pickup.onclick = () => {
+            let actions = human.getValidActions();
+            if (actions.includes('pickup')) {
+                human.pickup(true);
+                setTimeout(() => {
+                    computer.act();
+                }, 500);
+            }
+        }
+    }
+
 }
 
 // >> ========================================================
@@ -52,7 +147,7 @@ class PlayingCard extends HTMLElement {
 
     static clearDragged() {
         if (this.dragged) {
-            toggleHidden(this.dragged, false);
+            utils.toggleHidden(this.dragged, false);
         }
         this.dragged = null;
     }
@@ -174,6 +269,129 @@ class PlayingCard extends HTMLElement {
 customElements.define('playing-card', PlayingCard);
 
 // >> ========================================================
+// >> VariableTimer Class
+// >> ========================================================
+
+/** 
+ * ~ Variable timer that can be paused / resumed and run at different speeds
+ */
+class VariableTimer {
+    /**  
+     * ~ Variable timer that can be paused / resumed and run at different speeds
+     * @param {number} [milliseconds=1000]
+     * @param {number} [speed=1]
+     * @param {number} [fps=60]
+     */
+    constructor(milliseconds = 1000, speed = 1, fps = 60) {
+        this.maximum = milliseconds;
+        this.remaining = milliseconds;
+        this.speed = speed;
+        this.fps = fps;
+        this.period = 1000 / fps;
+        this.callback = null;
+        this.interval = null;
+    }
+
+    /** 
+     * ~ Reduce the time on the timer by the speed value
+     * @returns {undefined}
+     */
+    tick() {
+        this.remaining -= this.period * this.speed;
+        if (this.remaining <= 0) {
+            this.clearInterval();
+            this.runCallback();
+            this.clearCallback();
+        }
+    }
+
+    /** 
+     * ~ 
+     * @returns {undefined}
+     */
+    restart(speed = 1, callback = null) {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+        this.remaining = this.maximum;
+        this.speed = speed;
+        if (callback) {
+            this.callback = callback;
+        }
+        this.interval = setInterval(() => {
+            this.tick();
+        }, this.period);
+    }
+
+    /** 
+     * ~ Clear current interval if found
+     * @returns {boolean}
+     */
+    clearInterval() {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+        this.interval = null;
+    }
+
+    /** 
+     * ~ Clear current callback
+     * @returns {undefined}
+     */
+    clearCallback() {
+        this.callback = null;
+    }
+
+    /** 
+     * ~ Run current callback
+     * @returns {undefined}
+     */
+    runCallback() {
+        if (typeof this.callback === 'function') {
+            this.callback();
+        }
+    }
+
+    /** 
+     * ~ Set the interval for the timer to tick
+     * @returns {undefined}
+     */
+    setInterval() {
+        this.interval = setInterval(() => {
+            this.tick();
+        }, this.period);
+    }
+
+    /** 
+     * ~ Pause the timer without resetting the remaining time
+     * @returns {undefined}
+     */
+    pause() {
+        this.clearInterval();
+    }
+
+    /** 
+     * ~ Resume the timer by creating or replacing current interval
+     * @returns {undefined}
+     */
+    resume() {
+        this.setInterval();
+    }
+
+    /** 
+     * ~ Set the speed of the timer, and continue running if needed
+     * @param {number} speed
+     * @returns {undefined}
+     */
+    setSpeed(speed) {
+        this.speed = speed;
+        if (this.interval) {
+            this.resume();
+        }
+    }
+}
+
+// >> ========================================================
 // >> Overlays Class
 // >> ========================================================
 
@@ -233,156 +451,6 @@ class Overlays {
     //     setTimeout(() => {
     //         Overlays.cleanse(element);
     //     }, milliseconds);
-    // }
-
-}
-
-// >> ========================================================
-// >> VariableTimer Class
-// >> ========================================================
-
-/** 
- * ~ Variable timer that can be paused / resumed and run at different speeds
- */
-class VariableTimer {
-    /**  
-     * ~ Variable timer that can be paused / resumed and run at different speeds
-     * @param {number} [milliseconds=1000]
-     * @param {number} [speed=1]
-     * @param {number} [fps=60]
-     */
-    constructor(milliseconds = 1000, speed = 1, fps = 60) {
-        this.maximum = milliseconds;
-        this.remaining = milliseconds;
-        this.speed = speed;
-        this.fps = fps;
-        this.period = 1000 / fps;
-        this.callback = null;
-        this.interval = null;
-    }
-
-    /** 
-     * ~ Reset the timer to its maximum duration without affecting interval
-     * @returns {undefined}
-     */
-    resetTimer() {
-        this.remaining = this.maximum;
-    }
-
-    /** 
-     * ~ 
-     * @returns {undefined}
-     */
-    restart(speed = 1, callback = null) {
-        console.log('restarted timer')
-        if (this.interval) {
-            clearInterval(this.interval);
-        }
-        this.remaining = this.maximum;
-        this.speed = speed;
-        if (callback) {
-            this.callback = callback;
-        }
-        this.interval = setInterval(() => {
-            this.tick();
-        }, this.period);
-    }
-
-    /** 
-     * ~ Clear current interval if found
-     * @returns {boolean}
-     */
-    clearInterval() {
-        if (this.interval) {
-            clearInterval(this.interval);
-        }
-        this.interval = null;
-    }
-
-    /** 
-     * ~ Clear current callback
-     * @returns {undefined}
-     */
-    clearCallback() {
-        this.callback = null;
-    }
-
-    /** 
-     * ~ Run current callback
-     * @returns {undefined}
-     */
-    runCallback() {
-        if (typeof this.callback === 'function') {
-            this.callback();
-        }
-    }
-
-    /** 
-     * ~ Set the interval for the timer to tick
-     * @returns {undefined}
-     */
-    setInterval() {
-        this.interval = setInterval(() => {
-            this.tick();
-        }, this.period);
-    }
-
-    /** 
-     * ~ Reset and start the timer
-     * @returns {undefined}
-     */
-    start() {
-        this.resetTimer();
-        this.setInterval();
-    }
-
-    /** 
-     * ~ Pause the timer without resetting the remaining time
-     * @returns {undefined}
-     */
-    pause() {
-        this.clearInterval();
-    }
-
-    /** 
-     * ~ Resume the timer by creating or replacing current interval
-     * @returns {undefined}
-     */
-    resume() {
-        this.setInterval();
-    }
-
-    /** 
-     * ~ Set the speed of the timer, and continue running if needed
-     * @param {number} speed
-     * @returns {undefined}
-     */
-    setSpeed(speed) {
-        this.speed = speed;
-        if (this.interval) {
-            this.resume();
-        }
-    }
-
-    /** 
-     * ~ Reduce the time on the timer by the speed value
-     * @returns {undefined}
-     */
-    tick() {
-        this.remaining -= this.period * this.speed;
-        if (this.remaining <= 0) {
-            this.clearInterval();
-            this.runCallback();
-            this.clearCallback();
-        }
-    }
-
-    // get running() {
-    //     return this.interval !== null;
-    // }
-
-    // get ended() {
-    //     return this.interval === null;
     // }
 
 }
@@ -454,7 +522,8 @@ class Pending {
             player.pickup()
         }
 
-        Pending.empty();
+        console.log('emptying pending data');
+        Pending.data = [];
 
         if (rank !== '7') {
             Game.inert = false;
@@ -491,40 +560,6 @@ class Pending {
             }, 200);
         }
     }
-
-    static empty() {
-        console.log('emptying pending data');
-        Pending.data = [];
-    }
-
-}
-
-// < ========================================================
-// < Wrapper Parent Class
-// < ========================================================
-
-/** 
- * ~ Wrapper class parent for classes with this.element attribute
-*/
-class Wrapper {
-
-    /** @type {HTMLElement} */
-    element;
-
-    /** @type {Wrapper[]} */
-    static objects = [];
-
-    constructor(id) {
-        this.element = document.getElementById(id);
-        this.constructor.objects.push(this);
-    }
-
-    static instanceCheck(obj) {
-        if (this !== Wrapper) {
-            throw new Error('instanceCheck should only be called from Wrapper class');
-        }
-        return obj instanceof this;
-    }
 }
 
 // >> ========================================================
@@ -534,10 +569,18 @@ class Wrapper {
 /** 
  * ~ Pile wrapper for container of playing-card elements
  */
-class Pile extends Wrapper {
+class Pile {
+
+    /** @type {HTMLElement} */
+    element;
 
     /** @type {Pile[]} */
     static objects = [];
+
+    constructor(id) {
+        this.element = document.getElementById(id);
+        Pile.objects.push(this);
+    }
 
     /**  
      * ~ 
@@ -583,6 +626,17 @@ class Pile extends Wrapper {
     get top() {
         let elements = this.element.querySelectorAll('playing-card');
         return elements[elements.length - 1];
+    }
+
+    /** 
+     * ~
+     * @returns {PlayingCard | undefined}  
+     */
+    pop() {
+        let elements = this.element.querySelectorAll('playing-card');
+        let element = elements[elements.length - 1];
+        element.remove()
+        return element;
     }
 
     /** 
@@ -659,7 +713,7 @@ class Pile extends Wrapper {
 }
 
 // >> ========================================================
-// >> Player Class and Subclasses
+// >> Player Class
 // >> ========================================================
 
 class Player {
@@ -678,9 +732,13 @@ class Player {
         Player.objects.push(this);
     }
 
-    wait() {
+    wait(switching) {
         Game.inert = true;
-        switchPlayer();
+        if (switching === true) {
+            switchPlayer();
+            return;
+        }
+        utils.assert(switching === false, "You must pass argument to Player.wait");
     }
 
     get piles() {
@@ -840,27 +898,17 @@ class Player {
         return actions;
     }
 
-}
-
-class Human extends Player {
-    constructor() {
-        super('human', 1, false)
-    }
-}
-
-class Computer extends Player {
-    constructor() {
-        super('computer', 2, true)
-    }
-
     act() {
         update();
         if (!this.isCurrentPlayer) {
-            console.log("It is not the computer's turn")
+            console.log(`It is not ${this.nickname}'s turn`)
             return;
         }
 
         let eight = getAnchorCard()?.rank === '8';
+        if (eight) {
+            showToast('seen 8');
+        }
         // POSTIT - Seems to be a bug with computer and 8s
 
         let activeCards = getActiveCards();
@@ -875,7 +923,7 @@ class Computer extends Player {
             }
             if (rank === '10') {
                 transferAll(center, burned);
-                // showToast('Computer burned the deck, delaying 1000ms', 3000);
+                showToast('Computer burned the deck, delaying 1000ms', 3000);
                 setTimeout(() => {
                     this.act();
                 }, 1000);
@@ -886,10 +934,11 @@ class Computer extends Player {
                 Game.inert = true;
             }
         } else if (eight) {
-            this.wait();
+            console.warn('waiting')
+            this.wait(false);
         } else {
-            console.log('Picking up', 'hand is', computer.hand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
-            transferAll(center, computer.hand, true);
+            console.log('Picking up', 'hand is', this.hand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
+            transferAll(center, this.hand, true);
         }
 
         switchPlayer();
@@ -901,75 +950,9 @@ class Computer extends Player {
 
 }
 
-// >> ========================================================
-// >> Utils Class
-// >> ========================================================
-
-class utils {
-    /**
-     * ~ Sorts an array based on a provided key function, with an optional reverse order
-     * @param {Array} array
-     * @param {Function} key
-     * @param {boolean} reverse
-     * @returns {Array}
-     */
-    static sort(array, key, reverse = false) {
-        return array.sort((a, b) => {
-            const comparison = key(a) - key(b);
-            return reverse ? -comparison : comparison;
-        });
-    }
-
-    /** 
-     * ~ Get a random element from an array
-     * @param {Array} array
-     * @returns {*} A random element from the array
-     */
-    static choice(array) {
-        return array[Math.floor(Math.random() * array.length)];
-    }
-
-    /** 
-     * ~ Shuffle an array in place  
-     * @param {Array} array - The array to shuffle  
-     * @returns {undefined}  
-     */
-    static shuffle(array) {
-        let currentIndex = array.length;
-        while (currentIndex != 0) {
-            let randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex--;
-            [array[currentIndex], array[randomIndex]] = [
-                array[randomIndex], array[currentIndex]];
-        }
-    }
-
-    static range(func, n = 1) {
-        Array.from({ length: n }).forEach(func);
-    }
-
-    /**
-     * ~ Postpone a callback to the next frame, to avoid JavaScript quirks
-     * @param {Function} callback
-     * @returns {undefined}
-     */
-    static postpone(callback) {
-        setTimeout(callback, 0);
-    }
-}
-
 // ! ========================================================
 // ! Other Functions
 // ! ========================================================
-
-/** 
- * ~ Toggle visibility for an element via .hidden class
- * @param {HTMLElement} element
- * @returns {undefined}
- */
-function toggleHidden(element, hidden = null) {
-    element.classList.toggle('hidden', hidden);
-}
 
 /** 
  * ~ Swtich to the next player, or a given player number
@@ -1123,7 +1106,7 @@ function updateInfo() {
 function update() {
     for (let player of [human, computer]) {
         if (player.hasWon()) {
-            alert(`${player.nickname} has won`)
+            showToast(`${player.nickname} has won`, 10000)
             return;
         }
         if (player.hand.length < 5 && deck.length > 0) {
@@ -1235,6 +1218,15 @@ function isValidCard(card) {
     let validRanks = currentValidRanks();
     let rank = card.rank;
     return validRanks.includes(rank);
+}
+
+function showToast(message, duration = 2000) {
+    const toaster = document.getElementById('toaster');
+    toaster.textContent = message;
+    toaster.classList.remove('hidden');
+    setTimeout(() => {
+        toaster.classList.add('hidden');
+    }, duration);
 }
 
 // >> ========================================================
@@ -1349,88 +1341,105 @@ function animateOverlay(element, duration = 1000) {
     growAndDelete(overlay, duration);
 }
 
-// > ========================================================
-// > Event Handler Helper Functions
-// > ========================================================
+// >> ========================================================
+// >> Helpers Class
+// >> ========================================================
 
-function setDragged(event, card) {
-    let clone = card.cloneNode(true);
-    clone.style.position = "absolute";
-    clone.style.top = "-9999px";
-    document.body.appendChild(clone);
-    event.dataTransfer.setDragImage(clone, 0, 0);
-    PlayingCard.setDragged(card);
-    utils.postpone(() => clone.remove());
-    utils.postpone(() => toggleHidden(card, true));
-}
-
-function clearDragged() {
-    PlayingCard.clearDragged();
+class Helpers {
+    static setDragged(event, card) {
+        let clone = card.cloneNode(true);
+        clone.style.position = "absolute";
+        clone.style.top = "-9999px";
+        document.body.appendChild(clone);
+        event.dataTransfer.setDragImage(clone, 0, 0);
+        PlayingCard.setDragged(card);
+        utils.postpone(() => clone.remove());
+        utils.postpone(() => utils.toggleHidden(card, true));
+    }
 }
 
 // >> ========================================================
-// >> Event Handler Functions
+// >> Handlers Class
 // >> ========================================================
 
-/** 
- * ~
- * @param {Event} event
- * @returns {undefined}
- */
-function dragstartHandler(event) {
-    console.log('dragstart')
-    let card = event.target.closest("playing-card");
-    if (!card) {
+class Handlers {
+
+    /** 
+     * ~
+     * @param {Event} event
+     * @returns {undefined}
+     */
+    static dragstart(event) {
+        console.log('dragstart')
+        let card = event.target.closest("playing-card");
+        if (!card) {
+            event.preventDefault();
+            return;
+        }
+        let activeCards = getActiveCards();
+        if (!activeCards.includes(card)) {
+            event.preventDefault();
+            return;
+        }
+        Helpers.setDragged(event, card);
+    }
+
+    /** 
+     * ~
+     * @param {Event} event
+     * @returns {undefined}
+     */
+    static drop(event) {
         event.preventDefault();
-        return;
+        let card = PlayingCard.dragged;
+        if (card.flipped || Pending.accepts(card) && Game.accepts(card)) {
+            Pending.submit(card);
+        }
     }
-    let activeCards = getActiveCards();
-    if (!activeCards.includes(card)) {
-        event.preventDefault();
-        return;
+
+    /** 
+     * ~
+     * @param {Event} event
+     * @returns {undefined}
+     */
+    static dragend(event) {
+        Overlays.cleanse(center.element);
+        PlayingCard.clearDragged();
     }
-    setDragged(event, card);
-}
 
-/** 
- * ~
- * @param {Event} event
- * @returns {undefined}
- */
-function dropHandler(event) {
-    event.preventDefault();
-    let card = PlayingCard.dragged;
-    if (card.flipped || Pending.accepts(card) && Game.accepts(card)) {
-        Pending.submit(card);
+    /** 
+     * ~
+     * @param {Event} event
+     * @returns {undefined}
+     */
+    static keydown(event) {
+
     }
-}
 
-/** 
- * ~
- * @param {Event} event
- * @returns {undefined}
- */
-function dragendHandler(event) {
-    Overlays.cleanse(center.element);
-    PlayingCard.clearDragged();
-}
+    static suppress(event) {
+        event.preventDefault()
+    }
 
-/** 
- * ~
- * @param {Event} event
- * @returns {undefined}
- */
-function keydownHandler(event) { }
+    static init() {
+        document.addEventListener("dragstart", this.dragstart);
+        center.element.addEventListener("drop", this.drop);
+        document.addEventListener("dragend", this.dragend);
+        document.addEventListener("dragover", this.suppress);
+        document.addEventListener("dragenter", this.suppress);
+        document.addEventListener("keydown", this.keydown);
+    }
+
+}
 
 // >> ========================================================
-// >> Core Object Initialisations
+// >> Core Object Initialisation
 // >> ========================================================
 
 let deck = new Pile('deck');
 let center = new Pile('center');
 let burned = new Pile('burned');
-let human = new Human();
-let computer = new Computer();
+let human = new Player('human', 1, false);
+let computer = new Player('computer', 2, true);
 
 // >> ========================================================
 // >> Entry Point Function
@@ -1442,37 +1451,13 @@ let computer = new Computer();
  */
 function main() {
     deck.populate(true, true);
-    utils.range(() => deck.top.remove(), 26)
-
+    utils.range(() => deck.top.remove(), 26);
     distributeStartingCards(human);
     distributeStartingCards(computer);
     pickBestShownCards(human);
     pickBestShownCards(computer);
-    document.addEventListener("dragstart", dragstartHandler);
-    center.element.addEventListener("drop", dropHandler);
-    document.addEventListener("dragend", dragendHandler);
-    document.addEventListener("dragover", (event) => event.preventDefault());
-    document.addEventListener("dragenter", (event) => event.preventDefault());
-    document.addEventListener("keydown", keydownHandler);
-
-    buttons.wait.onclick = () => {
-        let actions = human.getValidActions();
-        if (actions.includes('wait')) {
-            human.wait();
-            computer.act();
-        }
-    }
-
-    buttons.pickup.onclick = () => {
-        let actions = human.getValidActions();
-        if (actions.includes('pickup')) {
-            human.pickup(true);
-            setTimeout(() => {
-                computer.act();
-            }, 500);
-        }
-    }
-
+    Handlers.init();
+    Buttons.init();
     update();
 };
 
