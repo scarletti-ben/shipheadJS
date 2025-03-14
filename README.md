@@ -63,3 +63,24 @@ let pack = [];
 - Make overlay a class
 
 - Wait on 8
+
+# REWRITE
+
+# Information About Overlay Ticker
+- Using document.body.contains(overlay) in the grow function you can see that the ticker is still running when you cleanse card overlays, but it just isn't a child of the parent
+	- Perhaps a conditional ticker would be useful but for now just noting this behaviour
+
+```javascript
+let overlay = Overlay.create(card);
+let grow = (progress) => {
+	overlay.style.height = (100 * progress) + "%";
+	console.log(document.body.contains(overlay));
+}
+ticker(grow, ms)
+	.then((message) => Overlay.cleanse(overlay));    
+```
+
+# Aims
+- Switch turn
+- Computer action
+- Show information
