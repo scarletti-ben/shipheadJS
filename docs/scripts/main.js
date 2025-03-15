@@ -61,10 +61,11 @@ function main() {
     buttons.init();
     Game.init({ human, computer });
     Game.populate(true, true);
-    Game.cull(26);
+    Game.cull(30);
     Game.distributeStartingCards();
     Game.pickBestShownCards();
     Game.update();
+    // utils.logger.start();
 }
 
 // < ========================================================

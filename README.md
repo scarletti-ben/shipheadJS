@@ -84,3 +84,7 @@ ticker(grow, ms)
 - Switch turn
 - Computer action
 - Show information
+
+
+> [!IMPORTANT]
+- Overlays in utils.ticker .then pattern still exist, even when cleansed, until the end of their original ticker, they just aren't in the DOM structure, do with that information as you will

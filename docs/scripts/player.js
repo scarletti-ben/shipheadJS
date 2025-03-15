@@ -54,25 +54,9 @@ export class Player {
         return [this.left, this.middle, this.right];
     }
 
-    // /** 
-    //  * ~
-    //  * @returns {PlayingCard[]}  
-    //  */
-    // get shown() {
-    //     return this.table.filter(card => !card.flipped);
-    // }
-
-    // /** 
-    //  * ~
-    //  * @returns {PlayingCard[]}  
-    //  */
-    // get hidden() {
-    //     return this.table.filter(card => card.flipped);
-    // }
-
     /** 
      * ~
-     * @returns {PlayingCard[]}  
+     * @returns {Card[]}  
      */
     get handCards() {
         return this.hand.cards;
@@ -84,7 +68,7 @@ export class Player {
 
     /** 
      * ~
-     * @returns {PlayingCard[]}  
+     * @returns {Card[]}  
      */
     get tableCards() {
         let output = []
@@ -96,7 +80,7 @@ export class Player {
 
     /** 
      * ~
-     * @returns {PlayingCard[]}  
+     * @returns {Card[]}  
      */
     get shownCards() {
         return this.tableCards.filter(card => !card.flipped)
@@ -104,7 +88,7 @@ export class Player {
 
     /** 
      * ~
-     * @returns {PlayingCard[]}  
+     * @returns {Card[]}  
      */
     get hiddenCards() {
         return this.tableCards.filter(card => card.flipped)
@@ -130,8 +114,12 @@ export class Player {
     }
 
     notice(text) {
-        return;
-        console.log(`${this.nickname}: ${text}`)
+        utils.log(`${this.nickname}: ${text}`)
+    }
+
+    refill() {
+        let quantity = Math.min(deck.cards.length, 5 - this.hand.length);
+        deck.popTo(this.hand, quantity, this.flips)
     }
 
     /** 
@@ -174,11 +162,11 @@ export class Player {
         return actions;
     }
 
-    act() {
+    // ! ========================================================
+    // ! EXPERIMENTAL: 'act' instance method
+    // ! ========================================================
 
-        if (Game.over) {
-            return;
-        }
+    _act() {
         
         Game.update();
 
@@ -189,48 +177,47 @@ export class Player {
 
         let eight = Game.getAnchorCard()?.rank === '8';
         if (eight) {
-            // showToast('seen 8');
             console.log('seen 8')
         }
 
-        // POSTIT - Seems to be a bug with computer and 8s
-
-        let activeCards = Game.getActiveCards();
-
-        // let cards = [];
-        // if (activeCards) {
-        //     cards = activeCards.filter(card => Game.accepts(card))
-        // }
-
-        let cards = activeCards.filter(card => Game.accepts(card));
+        let elligible = Game.player.elligibleCards;
+        let cards = elligible.filter(card => Game.accepts(card));
 
         if (cards.length > 0) {
+            console.log('cards found')
             let ranks = cards.map(card => card.rank);
             let rank = utils.choice(ranks);
             let selected = cards.filter(card => card.rank === rank);
+            let n = utils.randint(0, selected.length - 1);
+            selected.splice(0, n);
+
+            if (n > 0) {
+                console.error('SPLICED', n)
+            }
+
+            // POSTIT - THIS IS HOW THE AI ADDS TOO MANY CARDS, PERHAPS PENDING SUBMIT / PROCESS BUT WITHOUT TIMER?
             for (let card of selected) {
                 center.add(card);
                 card.flip(false);
             }
-            if (rank === '10') {
+
+            let fourInARow = Game.fourInARow();
+
+            if (rank === '10' || fourInARow) {
                 Game.transferAll(center, burned, false);
-                // showToast('Computer burned the deck, delaying 1000ms', 3000);
-                console.log(`${this.nickname} burned the deck, delaying 1000ms, then act again`)
-                setTimeout(() => {
-                    this.act();
-                }, 1000);
+                Game.inert = false;
+                this.act();
                 return;
             } else if (rank !== '7') {
                 Game.inert = false;
             } else {
                 Game.inert = true;
             }
-        } else if (eight) {
-            console.warn('waiting')
+        } else if (eight && !Game.inert) {
+            console.error('waiting')
             this.wait(false);
         } else {
-            console.log('Picking up', 'hand is', this.hand.cards.map(card => card.rank), 'center is', center.cards.map(card => card.rank))
-            Game.transferAll(center, this.hand, this.flips);
+            this.pickup(false);
         }
 
         Game.nextPlayer();
@@ -238,6 +225,21 @@ export class Player {
             Game.update();
         }, 0);
 
+    }
+
+    act() {
+        if (true) {
+            if (!Game.over) {
+                setTimeout(() => {
+                    this._act();
+                }, 350);
+            }
+        }
+        else {
+            if (!Game.over) {
+                this._act();
+            }
+        }
     }
 
 }

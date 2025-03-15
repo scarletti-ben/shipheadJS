@@ -3,59 +3,40 @@
 // < ========================================================
 
 import { Game } from './game.js';
+import { utils } from './utils.js';
 
 // < ========================================================
 // < Exported buttons Object
 // < ========================================================
 
+let container = document.getElementById('button-container');
+
 export const buttons = {
 
-    wait: document.getElementById('wait-button'),
-    pickup: document.getElementById('pickup-button'),
-    act: document.getElementById('act-button'),
-
+    create(id) {
+        let button = document.createElement('div');
+        button.id = `${id}-button`;
+        button.classList.add('button-div')
+        button.innerText = utils.title(id);
+        container.appendChild(button);
+        buttons[id] = button;
+        return button;
+    },
+    
     init() {
-        // buttons.wait.onclick = () => {
-        //     let actions = game.player.getValidActions();
-        //     if (actions.includes('wait')) {
-        //         game.player.wait(true);
-        //         computer.act();
-        //     }
-        // }
-
-        // buttons.pickup.onclick = () => {
-        //     let actions = game.player.getValidActions();
-        //     if (actions.includes('pickup')) {
-        //         game.player.pickup(true);
-        //         setTimeout(() => {
-        //             computer.act();
-        //         }, 500);
-        //     }
-        // }
-
-        buttons.act.onclick = () => Game.player.act();
-
+        buttons.create('pickup').onclick = () => {
+            Game.player.pickup();
+            Game.nextPlayer();
+            Game.player.act();
+        };
+        buttons.create('wait').onclick = () => {
+            Game.player.wait();
+            Game.nextPlayer();
+            Game.player.act();
+        };
+        buttons.create('a').onclick = () => {
+            Game.player.act();
+        };
     }
 
 }
-
-// class Button {
-
-//     static objects = [];
-
-//     constructor(id, onclick) {
-//         this.element = document.getElementById(id);
-//         this.element.onclick = onclick;
-//         Button.objects.push(this);
-//     }
-
-//     static get elements() {
-//         return Button.objects.map(obj => obj.element);
-//     }
-
-//     static init() {
-//         new Button('wait-button', () => console.log('yee'));
-//         new Button('pickup-button', () => console.log('yee'));
-//     }
-
-// }

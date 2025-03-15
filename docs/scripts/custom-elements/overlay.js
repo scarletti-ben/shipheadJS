@@ -71,7 +71,9 @@ export class Overlay extends HTMLElement {
         } else if (Overlay.hasDirectOverlay(item)) {
             utils.log('Overlay.cleanse this item has an element-overlay');
             let overlays = Array.from(item.children).filter(child => child.tagName.toLowerCase() === 'element-overlay');
-            item.removeChild(overlays[0]);
+            for (let overlay of overlays) {
+                item.removeChild(overlay);
+            }
             utils.warn('Overlay.cleanse removing overlay as child');
         } else {
             utils.warn('Overlay.cleanse: item is not an overlay and does not have overlay')

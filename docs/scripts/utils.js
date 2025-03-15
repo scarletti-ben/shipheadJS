@@ -22,6 +22,29 @@ export const utils = {
         });
     },
 
+    /**
+     * @param {(progress: number) => void} callback - A function that takes accepts ticker progress (0 to 1) as an argument
+     * @param {number} duration - The duration in milliseconds for the ticker to run for
+     * @returns {Promise<string>} A promise that resolves when the ticker is finished, outputting string message
+     */
+    ticker(callback, duration) {
+        return new Promise((resolve) => {
+            let start = performance.now();
+            function tick() {
+                let current = performance.now();
+                let elapsed = current - start;
+                let progress = Math.min(elapsed / duration, 1);
+                callback(progress);
+                if (progress < 1) {
+                    requestAnimationFrame(tick);
+                } else {
+                    resolve('ticker finished');
+                }
+            }
+            requestAnimationFrame(tick);
+        });
+    },
+
     constrain(x, min, max) {
         return Math.min(Math.max(x, min), max);
     },
@@ -138,7 +161,7 @@ export const utils = {
      * @param {HTMLElement} element
      * @returns {undefined}
      */
-    toggleHidden(element, hidden = null) {
+    toggleHidden(element, hidden) {
         element.classList.toggle('hidden', hidden);
     },
 
@@ -155,6 +178,46 @@ export const utils = {
             event.dataTransfer.setDragImage(element, 0, 0);
             element.style.zIndex = '';
         })
+    },
+
+
+    logger: {
+
+        original: console.log,
+        messages: [],
+
+        start() {
+            function current(...args) {
+                let message = args.map(String).join(" ");
+                utils.logger.messages.push(message);
+                utils.logger.original.apply(console, args);
+            }
+            console.log = current;
+        },
+
+        download() {
+            const blob = new Blob([this.messages.join("\n")], { type: "text/plain" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "console_log.txt";
+            link.click();
+        },
+
+        finish() {
+            console.log = utils.logger.original;
+        }
+
+    },
+
+    randint(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    },
+
+    title(str) {
+        return str.replace(/\w\S*/g, text => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase());
     }
+
 
 };
