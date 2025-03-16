@@ -9,6 +9,12 @@ import { Game } from './game.js';
 import { Overlay } from './custom-elements/overlay.js';
 
 // < ========================================================
+// < Queries for HTML Elements
+// < ========================================================
+
+let information = document.getElementById('information')
+
+// < ========================================================
 // < Exported handlers Object
 // < ========================================================
 
@@ -212,6 +218,7 @@ export const handlers = {
         document.addEventListener("dragover", handlers.suppress);
         document.addEventListener("dragenter", handlers.suppress);
         document.addEventListener("keydown", handlers.keydown);
+        information.addEventListener("click", () => utils.toggleHidden(information, true));
     }
 
 };

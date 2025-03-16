@@ -26,26 +26,18 @@ export class Player {
         Player.objects.push(this);
     }
 
-    wait(switching) {
+    wait() {
         Game.inert = true;
-        if (switching === true) {
-            Game.nextPlayer();
-            return;
-        }
-        utils.assert(switching === false, "You must pass argument to Player.wait");
     }
 
     get piles() {
         return [this.hand, this.left, this.middle, this.right];
     }
 
-    pickup(switching = true) {
+    pickup() {
         Game.transferAll(center, this.hand, this.flips);
-        if (switching) {
-            Game.nextPlayer();
-        }
     }
-    
+
     /** 
      * ~
      * @returns {Pile[]}  
@@ -93,7 +85,7 @@ export class Player {
     get hiddenCards() {
         return this.tableCards.filter(card => card.flipped)
     }
-    
+
     get elligibleCards() {
         if (this.hand.length > 0) {
             return this.hand.cards;
@@ -167,7 +159,7 @@ export class Player {
     // ! ========================================================
 
     _act() {
-        
+
         Game.update();
 
         if (!this.isCurrentPlayer) {
@@ -215,9 +207,9 @@ export class Player {
             }
         } else if (eight && !Game.inert) {
             console.error('waiting')
-            this.wait(false);
+            this.wait();
         } else {
-            this.pickup(false);
+            this.pickup();
         }
 
         Game.nextPlayer();
@@ -227,18 +219,15 @@ export class Player {
 
     }
 
-    act() {
-        if (true) {
-            if (!Game.over) {
-                setTimeout(() => {
-                    this._act();
-                }, 350);
-            }
+    act(delay = 350) {
+        if (Game.over) return;
+        if (delay !== 0) {
+            setTimeout(() => {
+                this._act();
+            }, delay);
         }
         else {
-            if (!Game.over) {
-                this._act();
-            }
+            this._act();
         }
     }
 

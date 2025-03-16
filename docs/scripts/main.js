@@ -66,6 +66,19 @@ function main() {
     Game.pickBestShownCards();
     Game.update();
     // utils.logger.start();
+
+    information.innerText = '';
+    let newline = (message, n = 0) => information.innerText += '\n'.repeat(n) + message + '\n';
+    newline('Build 0.0.1-alpha');
+    newline('> PC version functional');
+    newline('> Mobile version untested');
+    newline('Bugs', 1);
+    newline('> Overlays can get stuck when cards burned or picked up');
+    newline('> Players able to play multiple cards from a ground pile, instead of just shown OR hidden');
+    newline('> Win condition is calculated before pending cards are processed');
+    newline('Temporary Features', 1);
+    newline('> 350ms delay for player.action calls');
+
 }
 
 // < ========================================================

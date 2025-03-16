@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { Card } from './custom-elements/card.js';
 import { Pending } from './pending.js';
 import { utils } from './utils.js';
+import { Overlay } from './custom-elements/overlay.js';
 
 // < ========================================================
 // < Exported Game Object
@@ -118,8 +119,14 @@ export class Game {
                 return;
             }
             else if (deck.cards.length > 0) {
-                player.refill()
+                player.refill();
             }
+            // POSTIT - Temporary fix for overlay issue
+            setTimeout(() => {
+                for (let card of player.handCards) {
+                    Overlay.cleanse(card);
+                }
+            }, 50);
         }
 
         for (let [name, player] of Object.entries(Game.players)) {

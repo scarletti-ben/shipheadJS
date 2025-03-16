@@ -79,9 +79,9 @@ export class Pending {
         this.cards = [];
         this.timer = null;
 
+        // POSTIT this is causing overlay issues
         if (!wasAcceptable) {
-            // POSTIT this is causing overlay issues
-            Game.player.pickup(false);
+            Game.player.pickup();
             return Game.nextPlayer(true);
         }
 
