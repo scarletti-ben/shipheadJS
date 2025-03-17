@@ -51,6 +51,7 @@ export class Game {
         index = ++index % players.length;
         Game.player = players[index];
         Game.update();
+        console.error(Game.player)
         if (acting) {
             Game.player.act();
         }
@@ -90,20 +91,20 @@ export class Game {
             return result;
         }
 
-        function hiddenAccepts(card = null) {
+        function blindAccepts(card = null) {
             let x = Pending.cards.length === 0;
             console.log('Pending.cards.length === 0', x);
-            let y = Game.player.elligibleCards.every(c => c.flipped && !Game.player.hand.includes(c))
-            console.log('all elligible cards are flipped and not in player hand (GROUND ACTIVE)', y);
+            let y = Game.player.availableCards.every(c => c.flipped && !Game.player.hand.includes(c))
+            console.log('all available cards are flipped and not in player hand (GROUND ACTIVE)', y);
             let result = x && y
-            console.log(`hiddenAccepts(card) result`, result)
+            console.log(`blindAccepts(card) result`, result)
             return result;
         }
 
         let pendingAccepted = pendingAccepts(card);
         let gameAccepted = gameAccepts(card);
-        let hiddenAccepted = hiddenAccepts(card);
-        let result = hiddenAccepted || pendingAccepted && gameAccepted
+        let blindAccepted = blindAccepts(card);
+        let result = blindAccepted || pendingAccepted && gameAccepted
         console.log(`Game.accepts(card) finalised result`, result)
         return result
 
@@ -167,7 +168,7 @@ export class Game {
         }
 
         information.innerHTML = `
-            <div>Player: ${Game.player.nickname}</div>
+            <div>Player: ${Game.player.name}</div>
             <br>
             <div>Inert: ${Game.inert}</div>
             <div>Top Card: ${topRank}</div>
@@ -200,10 +201,8 @@ export class Game {
 
     static distributeStartingCards() {
         for (let player of Object.values(Game.players)) {
-            for (let pile of player.tablePiles) {
-                deck.popTo(pile, 1, true);
-                deck.popTo(pile, 1, false);
-            }
+            deck.popTo(player.blind, 3, true);
+            deck.popTo(player.shown, 3, false);
             deck.popTo(player.hand, 5, player.flips);
         }
     }
@@ -213,30 +212,12 @@ export class Game {
             let cards = [...player.handCards, ...player.shownCards];
             for (let card of cards) player.hand.add(card, player.flips);
             utils.sort(cards, (card) => card.startValue, true);
-            player.left.add(cards[0], false);
-            player.middle.add(cards[1], false);
-            player.right.add(cards[2], false);
+            let x = [...cards.slice(0, 3)];
+            for (let y of x) {
+                player.shown.add(y, false);
+            }
         }
     }
-
-    // static getActiveCards() {
-    //     let array;
-    //     let player = Game.player;
-
-    //     if (player.hand.cards.length > 0) {
-    //         array = player.hand.cards;
-    //     } else {
-    //         let shown = player.shownCards;
-    //         let hidden = player.hiddenCards;
-    //         if (shown.length > 0) array = shown;
-    //         else if (hidden.length > 0) array = hidden;
-    //         else {
-    //             console.error(`Player ${Game.player} has won`);
-    //             Game.over = true;
-    //         }
-    //     }
-    //     return array;
-    // }
 
     static foundRank(rank) {
         return Game.getAnchorRank() === String(rank);
@@ -269,6 +250,9 @@ export class Game {
             console.log(" - card instanceof Card:", card instanceof Card);
             console.log(" - source === Pending.cards:", source === Pending.cards);
             console.log(" - destination === Pending.cards:", destination === Pending.cards);
+
+            // POSTIT
+            Overlay.cleanse(card);
             
             for (let item of [source, destination]) {
                 console.log("\nChecking item:", item);

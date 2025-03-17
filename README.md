@@ -159,7 +159,7 @@ Things that may be useful
 - Static property: `Player.instances`
 
 ### Player Instance Attributes / Getters
-- `player.nickname`
+- `player.name`
 - `player.value`
 - `player.flips`
 - `player.hand`
@@ -172,7 +172,7 @@ Things that may be useful
 - `player.tableCards`
 - `player.shownCards`
 - `player.hiddenCards`
-- `player.elligibleCards`
+- `player.availableCards`
 - `player.isCurrentPlayer`
 
 ### Player Instance Methods

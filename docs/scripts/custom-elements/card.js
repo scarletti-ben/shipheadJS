@@ -58,6 +58,9 @@ export class Card extends HTMLElement {
         console.log(`Custom element ${this.tagname} registered`);
     }
 
+    // ! ========================================================
+    // ! ========================================================
+
     get rank() {
         return this.getAttribute('rank');
     }
@@ -82,11 +85,8 @@ export class Card extends HTMLElement {
         this.setAttribute('flipped', value);
     }
 
-    /** @param {boolean | null} flipped */
-    flip(flipped = null) {
-        let setting = flipped === null ? !this.flipped : flipped;
-        this.setAttribute('flipped', setting);
-    }
+    // ! ========================================================
+    // ! ========================================================
 
     get identifier() {
         return this.flipped ? 'back' : `${this.rank}_${this.suit}`
@@ -102,6 +102,9 @@ export class Card extends HTMLElement {
         return Card.startValues[rankIndex];
     }
 
+    // ! ========================================================
+    // ! ========================================================
+
     get pile() {
         let piles = Pile.instances;
         for (let pile of piles) {
@@ -112,18 +115,29 @@ export class Card extends HTMLElement {
     }
 
     get owner() {
-        let pile = this.pile;
         let players = Player.instances;
         for (let player of players) {
-            if (player.piles.includes(pile)) {
+            if (player.cards.includes(this)) {
                 return player;
             }
         }
     }
 
+    // ! ========================================================
+    // ! ========================================================
+
+    /** @param {boolean | null} flipped */
+    flip(flipped = null) {
+        let setting = flipped === null ? !this.flipped : flipped;
+        this.setAttribute('flipped', setting);
+    }
+
     update() {
         this.innerHTML = SVG(this.identifier);
     }
+
+    // ! ========================================================
+    // ! ========================================================
 
     attributeChangedCallback(name, oldValue, newValue) {
         if (this._initialised && oldValue !== newValue) {

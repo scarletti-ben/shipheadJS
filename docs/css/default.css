@@ -193,7 +193,7 @@ body {
 
 /* ========================================================================= */
 
-.band {
+.section {
   width: 100%;
   height: auto;
   display: flex;
@@ -201,7 +201,7 @@ body {
   justify-content: center;
 }
 
-#computer-hand-band {
+#computer-hand-section {
   position: absolute;
   left: 0;
   top: 0;
@@ -210,7 +210,7 @@ body {
   z-index: 9;
 }
 
-#human-hand-band {
+#human-hand-section {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -219,7 +219,7 @@ body {
   z-index: 9;
 }
 
-#center-band {
+#center-section {
   justify-content: space-evenly;
 }
 
@@ -228,18 +228,29 @@ body {
 .ground {
   width: auto;
   height: auto;
+
+  /* height: calc(1.5 * var(--pch)); */
+  display: flex;
+  flex-direction: column;
+  /* justify-content: center; */
+  gap: 4px;
+}
+
+.ground card-pile {
+  width: auto;
+  height: auto;
   display: flex;
   flex-direction: row;
   justify-content: center;
   gap: 4px;
 }
 
-.ground card-pile playing-card {
-  margin-top: -78px;
+#human-ground card-pile:last-of-type {
+  margin-top: -80px;
 }
 
-.ground card-pile playing-card:first-of-type {
-  margin-top: 0px;
+#computer-ground card-pile:last-of-type {
+  margin-top: -80px;
 }
 
 /* ========================================================================= */

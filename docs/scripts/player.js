@@ -15,16 +15,15 @@ export class Player {
 
     /** @type {Player[]} */
     static instances = [];
-    static delay = 350;
+    static delay = 0;
 
-    constructor(nickname, value, flips) {
-        this.nickname = nickname;
+    constructor(name, value, flips) {
+        this.name = name;
         this.value = value;
         this.flips = flips;
-        this.hand = Pile.create(`${this.nickname}-hand`);
-        this.left = Pile.create(`${this.nickname}-left`);
-        this.middle = Pile.create(`${this.nickname}-middle`);
-        this.right = Pile.create(`${this.nickname}-right`);
+        this.blind = Pile.create(`${this.name}-blind`);
+        this.shown = Pile.create(`${this.name}-shown`);
+        this.hand = Pile.create(`${this.name}-hand`);
         Player.instances.push(this);
     }
 
@@ -32,75 +31,8 @@ export class Player {
         Game.inert = true;
     }
 
-    get piles() {
-        return [this.hand, this.left, this.middle, this.right];
-    }
-
     pickup() {
         Game.transferAll(center, this.hand, this.flips);
-    }
-
-    /** 
-     * ~
-     * @returns {Pile[]}  
-     */
-    get tablePiles() {
-        return [this.left, this.middle, this.right];
-    }
-
-    /** 
-     * ~
-     * @returns {Card[]}  
-     */
-    get handCards() {
-        return this.hand.cards;
-    }
-
-    hasWon() {
-        return this.elligibleCards.length === 0;
-    }
-
-    /** 
-     * ~
-     * @returns {Card[]}  
-     */
-    get tableCards() {
-        let output = []
-        for (let pile of this.tablePiles) {
-            output = output.concat(pile.cards);
-        }
-        return output
-    }
-
-    /** 
-     * ~
-     * @returns {Card[]}  
-     */
-    get shownCards() {
-        return this.tableCards.filter(card => !card.flipped)
-    }
-
-    /** 
-     * ~
-     * @returns {Card[]}  
-     */
-    get hiddenCards() {
-        return this.tableCards.filter(card => card.flipped)
-    }
-
-    get elligibleCards() {
-        if (this.hand.length > 0) {
-            return this.hand.cards;
-        }
-        else if (this.tableCards.length > 0) {
-            if (this.shownCards.length > 0) {
-                return this.shownCards;
-            }
-            return this.hiddenCards;
-        }
-        else {
-            return [];
-        }
     }
 
     get isCurrentPlayer() {
@@ -108,30 +40,75 @@ export class Player {
     }
 
     notice(text) {
-        utils.log(`${this.nickname}: ${text}`)
+        utils.log(`${this.name}: ${text}`)
     }
 
     refill() {
         let quantity = Math.min(deck.cards.length, 5 - this.hand.length);
-        deck.popTo(this.hand, quantity, this.flips)
+        deck.popTo(this.hand, quantity, this.flips);
     }
 
-    /** 
-     * ~ 
-     * @returns {boolean}
-     */
+    // ! ========================================================
+    // ! ========================================================
+
+    get handCards() {
+        return this.hand.cards;
+    }
+
+    get shownCards() {
+        return this.shown.cards;
+    }
+
+    get blindCards() {
+        return this.blind.cards;
+    }
+
+    get groundCards() {
+        return [...this.shownCards, ...this.blindCards]
+    }
+
+    get cards() {
+        return [...this.handCards, ...this.shownCards, ...this.blindCards];
+    }
+
+    get piles() {
+        return [this.hand, this.shown, this.blind];
+    }
+
+    // ! ========================================================
+    // ! ========================================================
+
+    hasWon() {
+        return this.availableCards.length === 0;
+    }
+
+    get availableCards() {
+        if (this.handCards.length > 0) {
+            return this.handCards;
+        }
+        else if (this.shownCards.length > 0) {
+            return this.shownCards;
+        }
+        else if (this.blindCards.length > 0) {
+            return this.blindCards
+        }
+        else {
+            return [];
+        }
+    }
+
     canPlay() {
         if (!this.isCurrentPlayer) {
             this.notice('Not current player');
             return false;
         }
-        let elligibleCards = this.elligibleCards;
-        if (elligibleCards.length < 1) {
-            this.notice('No elligible cards');
+        let availableCards = this.availableCards;
+        if (availableCards.length < 1) {
+            this.notice('No available cards');
             return false;
         }
         let ranks = Game.currentValidRanks();
-        let validCards = elligibleCards.filter(card => ranks.includes(card.rank));
+        let validCards = availableCards.filter(card => ranks.includes(card.rank));
         if (validCards.length < 1) {
             this.notice('No valid cards');
             return false;
@@ -161,9 +138,9 @@ export class Player {
     // ! ========================================================
 
     _act() {
-        utils.assert(this.isCurrentPlayer, `It is not ${this.nickname}'s turn`);
+        utils.assert(this.isCurrentPlayer, `It is not ${this.name}'s turn`);
         let anchor = Game.getAnchorRank();
-        let available = Game.player.elligibleCards;
+        let available = Game.player.availableCards;
         let valid = available.filter(card => Game.accepts(card));
         if (valid.length < 1) {
             if (anchor === '8' && !Game.inert) {
@@ -177,11 +154,19 @@ export class Player {
         } else {
             let ranks = valid.map(card => card.rank);
             let rank = utils.choice(ranks);
-            let selected = valid.filter(card => card.rank === rank);
-            let n = utils.randint(0, selected.length - 1);
-            selected.splice(0, n);
-            for (let card of selected) {
-                Pending.submit(card, this, false, 0);
+            let possible = valid.filter(card => card.rank === rank);
+            // POSTIT
+            if (Game.player.blind.includes(possible[0])) {
+                console.warn('BLIND, PICKED SINGLE')
+                Pending.submit(possible[0], this, false, 0);
+                return;
+            } else {
+                console.log('NOT BLIND');
+                let n = utils.randint(0, possible.length - 1);
+                possible.splice(0, n);
+                for (let card of possible) {
+                    Pending.submit(card, this, false, 0);
+                }
             }
         }
     }

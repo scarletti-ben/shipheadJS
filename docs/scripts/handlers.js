@@ -98,16 +98,24 @@ export const handlers = {
 
         if (!card) return handlers.suppress(event);
 
-        // > Ensure that the dragged card is elligible to be picked up
-        if (!Game.player.elligibleCards.includes(card)) {
-            console.error('cannot drag, this card is not in elligibleCards');
+        let available = Game.player.availableCards;
+
+        // > Ensure that the dragged card is available to be picked up
+        if (!available.includes(card)) {
+            console.error('cannot drag, this card is not in availableCards');
+            return handlers.suppress(event);
+        }
+
+        // POSTIT
+        if (Game.player.blind.includes(card) && Pending.cards.length > 0) {
+            console.error('cannot drag, only one card from blind');
             return handlers.suppress(event);
         }
 
         Card.dragged = card;
         if (Game.accepts(card)) {
             Overlay.create(center);
-        }     
+        }
 
         utils.setDragImage(event, card);
         utils.postpone(() => utils.toggleHidden(card, true));
@@ -123,7 +131,7 @@ export const handlers = {
             let source = card.pile;
 
             // POSTIT
-            if (Game.player.hiddenCards.includes(card)) {
+            if (Game.player.blindCards.includes(card)) {
                 console.error('yee');
             }
 

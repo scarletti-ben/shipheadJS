@@ -55,7 +55,7 @@ export class Pending {
         this.cards = [];
         this.timer = null;
         if (!wasAcceptable) {
-            console.error(`Cards played by ${Game.player.nickname} were not acceptable`);
+            console.error(`Cards played by ${Game.player.name} were not acceptable`);
             Game.player.pickup();
             return Game.nextPlayer(acting);
         }
