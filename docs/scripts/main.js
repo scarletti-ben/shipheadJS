@@ -10,6 +10,7 @@ import { Player } from './player.js';
 import { Game } from './game.js';
 import { handlers } from './handlers.js';
 import { buttons } from './buttons.js';
+import { Pending } from './pending.js';
 
 // < ========================================================
 // < Registration of Custom HTML Elements
@@ -35,7 +36,7 @@ let center = Pile.create('center', page)
 let burned = Pile.create('burned', page)
 
 // < ========================================================
-// < Instantiation of Other Objects
+// < Instantiation of Other Object Instances
 // < ========================================================
 
 let human = new Player('human', 0, false);
@@ -67,6 +68,8 @@ function main() {
     Game.update();
     // utils.logger.start();
 
+    // Game.transfer(burned.top, burned, center, false);
+
     information.innerText = '';
     let newline = (message, n = 0) => information.innerText += '\n'.repeat(n) + message + '\n';
     newline('Build 0.0.1-alpha');
@@ -78,6 +81,9 @@ function main() {
     newline('> Win condition is calculated before pending cards are processed');
     newline('Temporary Features', 1);
     newline('> 350ms delay for player.action calls');
+
+    window.Game = Game;
+    window.Pending = Pending;
 
 }
 

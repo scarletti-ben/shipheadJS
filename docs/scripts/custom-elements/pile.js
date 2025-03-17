@@ -17,11 +17,11 @@ export class Pile extends HTMLElement {
     static tagName = 'card-pile';
 
     /** @type {Pile[]} */
-    static objects = [];
+    static instances = [];
 
     constructor() {
         super();
-        Pile.objects.push(this);
+        Pile.instances.push(this);
     }
 
     /** @returns {Card[]} */

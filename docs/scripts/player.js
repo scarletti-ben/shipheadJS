@@ -4,6 +4,7 @@
 
 import { Pile } from './custom-elements/pile.js';
 import { Game } from './game.js';
+import { Pending } from './pending.js';
 import { utils } from './utils.js';
 
 // < ========================================================
@@ -13,7 +14,8 @@ import { utils } from './utils.js';
 export class Player {
 
     /** @type {Player[]} */
-    static objects = [];
+    static instances = [];
+    static delay = 350;
 
     constructor(nickname, value, flips) {
         this.nickname = nickname;
@@ -23,7 +25,7 @@ export class Player {
         this.left = Pile.create(`${this.nickname}-left`);
         this.middle = Pile.create(`${this.nickname}-middle`);
         this.right = Pile.create(`${this.nickname}-right`);
-        Player.objects.push(this);
+        Player.instances.push(this);
     }
 
     wait() {
@@ -155,76 +157,43 @@ export class Player {
     }
 
     // ! ========================================================
-    // ! EXPERIMENTAL: 'act' instance method
+    // ! EXPERIMENTAL
     // ! ========================================================
 
     _act() {
-
-        Game.update();
-
-        if (!this.isCurrentPlayer) {
-            console.log(`It is not ${this.nickname}'s turn`)
-            return;
-        }
-
-        let eight = Game.getAnchorCard()?.rank === '8';
-        if (eight) {
-            console.log('seen 8')
-        }
-
-        let elligible = Game.player.elligibleCards;
-        let cards = elligible.filter(card => Game.accepts(card));
-
-        if (cards.length > 0) {
-            console.log('cards found')
-            let ranks = cards.map(card => card.rank);
+        utils.assert(this.isCurrentPlayer, `It is not ${this.nickname}'s turn`);
+        let anchor = Game.getAnchorRank();
+        let available = Game.player.elligibleCards;
+        let valid = available.filter(card => Game.accepts(card));
+        if (valid.length < 1) {
+            if (anchor === '8' && !Game.inert) {
+                this.wait();
+                Game.nextPlayer();
+            }
+            else {
+                this.pickup();
+                Game.nextPlayer();
+            }
+        } else {
+            let ranks = valid.map(card => card.rank);
             let rank = utils.choice(ranks);
-            let selected = cards.filter(card => card.rank === rank);
+            let selected = valid.filter(card => card.rank === rank);
             let n = utils.randint(0, selected.length - 1);
             selected.splice(0, n);
-
-            if (n > 0) {
-                console.error('SPLICED', n)
-            }
-
-            // POSTIT - THIS IS HOW THE AI ADDS TOO MANY CARDS, PERHAPS PENDING SUBMIT / PROCESS BUT WITHOUT TIMER?
             for (let card of selected) {
-                center.add(card);
-                card.flip(false);
+                Pending.submit(card, this, false, 0);
             }
-
-            let fourInARow = Game.fourInARow();
-
-            if (rank === '10' || fourInARow) {
-                Game.transferAll(center, burned, false);
-                Game.inert = false;
-                this.act();
-                return;
-            } else if (rank !== '7') {
-                Game.inert = false;
-            } else {
-                Game.inert = true;
-            }
-        } else if (eight && !Game.inert) {
-            console.error('waiting')
-            this.wait();
-        } else {
-            this.pickup();
         }
-
-        Game.nextPlayer();
-        setTimeout(() => {
-            Game.update();
-        }, 0);
-
     }
 
-    act(delay = 350) {
+    act() {
         if (Game.over) return;
-        if (delay !== 0) {
+        Game.update();
+        if (Game.over) return;
+        if (Player.delay !== 0) {
             setTimeout(() => {
                 this._act();
-            }, delay);
+            }, Player.delay);
         }
         else {
             this._act();

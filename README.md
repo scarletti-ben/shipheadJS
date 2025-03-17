@@ -88,3 +88,130 @@ ticker(grow, ms)
 
 > [!IMPORTANT]
 - Overlays in utils.ticker .then pattern still exist, even when cleansed, until the end of their original ticker, they just aren't in the DOM structure, do with that information as you will
+
+
+
+
+
+
+
+
+
+
+
+
+Things i keep needing
+- Top card in the pile
+- Top rank in the pile
+- Anchor card in the pile
+- Anchor rank in the pile
+- Is the top rank a certain rank
+- Is the anchor rank a certain rank
+- Is a card a certain rank
+- Is a card the same rank as the top card
+- Is a card the same rank as the anchor card
+- Who owns a card
+- Who is the current player
+- Which player did a card come from
+- Which pile did a card come from
+- Is a card playable
+
+Things that may be useful
+- Current in a row check, eg returns 3 6s in a row
+- player.owns(card)
+- player.remaining or player.quantity
+- player.haswon (if pending empty)
+- player.grounded
+- Making shown and hidden just be piles that align ltr instead of left middle right
+- Player.is object with attributes to clean namespace
+- Game.transfer with clear logging of card movements, contextually aware of where something came from, and where it is going
+
+> [!IMPORTANT]
+- Show and hidden piles instead of left middle right
+
+# Custom HTML Elements
+
+## Card
+- Class definition in the `JavaScript` is `class Card extends HTMLElement`
+- Static property: `Card.instances`
+`attributeChangedCallback(name, oldValue, newValue)`
+`connectedCallback()`
+`disconnectedCallback()`
+`customElements.define('playing-card', Card);`
+`static get observedAttributes`
+- Example in the DOM is `<playing-card rank='ace' suit='spades' flipped='true'></playing-card>`
+
+### Card Instance Attributes / Getters
+`card.rank`
+`card.suit`
+`card.flipped`
+`card.pile`
+`card.owner`
+`card.identifier`
+
+### Card Instance Methods
+`card.flip(flipped = null)`
+`card.update()`
+`card.create(rank, suit, flipped)`
+
+## Player
+- Class definition: `class Player`
+- Static property: `Player.instances`
+
+### Player Instance Attributes / Getters
+- `player.nickname`
+- `player.value`
+- `player.flips`
+- `player.hand`
+- `player.left`
+- `player.middle`
+- `player.right`
+- `player.piles`
+- `player.tablePiles`
+- `player.handCards`
+- `player.tableCards`
+- `player.shownCards`
+- `player.hiddenCards`
+- `player.elligibleCards`
+- `player.isCurrentPlayer`
+
+### Player Instance Methods
+- `player.wait()`
+- `player.pickup()`
+- `player.hasWon()`
+- `player.notice(text)`
+- `player.refill()`
+- `player.canPlay()`
+- `player.getValidActions()`
+- `player.act(delay = 350)`
+
+
+## Overlay
+- Class definition: `class Overlay extends HTMLElement`
+- Static property:  
+  - `Overlay.tagName`
+  - `Overlay.defaultSettings`
+  - `Overlay.instances`
+
+### Overlay Instance Attributes
+- `overlay._connected`
+- `overlay._parent`
+- `overlay._task`
+
+### Overlay Static Methods
+- `Overlay.create(parent)`
+- `Overlay.hasDirectOverlay(item)`
+- `Overlay.isOverlay(element)`
+- `Overlay.cleanse(item)`
+- `Overlay.get observedAttributes`
+- `Overlay.register()`
+
+### Overlay Instance Methods
+- `overlay.connectedCallback()`
+- `overlay.disconnectedCallback()`
+
+# Game
+A zero instance class with a static init, used to hold a great deal of the "game logic" and interactions between different modules / instances / objects within the game.
+
+# Handlers
+# Utils

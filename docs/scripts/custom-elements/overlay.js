@@ -24,13 +24,10 @@ export class Overlay extends HTMLElement {
         pointerEvents: 'none'
     };
 
-    static objects = [];
-
     constructor() {
         super();
         this._connected = null;
         this._parent = null;
-        this._task = null;
     }
 
     /**
@@ -43,7 +40,6 @@ export class Overlay extends HTMLElement {
         parent.appendChild(overlay);
         overlay._parent = parent;
         Object.assign(overlay.style, Overlay.defaultSettings);
-        Overlay.objects.push(overlay);
         return overlay;
     }
 

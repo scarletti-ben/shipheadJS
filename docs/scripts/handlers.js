@@ -93,117 +93,59 @@ export const handlers = {
     // ! ========================================================
 
     dragstart(event) {
-
-        console.log(`dragstart: event handling ${event}`);
-
+        // console.warn(`dragstart: event handling ${event}`);
         let card = event.target.closest("playing-card");
 
-        utils.log(`dragstart: closest card ${card?.rank}`);
-
-        if (!card) {
-            event.preventDefault();
-            utils.log(`dragstart: no card found, prevented default`);
-            return;
-        }
+        if (!card) return handlers.suppress(event);
 
         // > Ensure that the dragged card is elligible to be picked up
         if (!Game.player.elligibleCards.includes(card)) {
-            console.warn('cannot drag, this card is not in elligibleCards');
-            event.preventDefault();
-            return;
+            console.error('cannot drag, this card is not in elligibleCards');
+            return handlers.suppress(event);
         }
 
         Card.dragged = card;
-
-
         if (Game.accepts(card)) {
-            utils.log(`dragstart: Game.accepts passed`);
             Overlay.create(center);
-
-        } else {
-            utils.log(`dragstart: Game.accepts card failed`);
-        }
+        }     
 
         utils.setDragImage(event, card);
         utils.postpone(() => utils.toggleHidden(card, true));
 
-        utils.log(`dragstart: setDragImage called`);
-        utils.log(`dragstart: reached end of function`)
-
     },
 
     drop(event) {
-
-        console.log(`drop: event handling ${event}`)
-
+        // console.warn(`drop: event handling ${event}`);
         let center = event.target.closest("#center");
-        if (!center) {
-            event.preventDefault();
-            return;
-        }
-
+        if (!center) return handlers.suppress(event);
         let card = Card.dragged;
-        let accepted = Game.accepts(card);
+        if (Game.accepts(card)) {
+            let source = card.pile;
 
-        if (accepted) {
-
-            utils.log(`drop: cleansing all Pending.cards of overlays`);
-            for (let x of Pending.cards) {
-                Overlay.cleanse(x);
+            // POSTIT
+            if (Game.player.hiddenCards.includes(card)) {
+                console.error('yee');
             }
 
-            // If card in player hidden, morePossible = false;
-            
-            // POSTIT - THIS IS THE HASMORE CHECK
-            let source = card.pile;
+            // POSTIT
             let quantity = source.numberOf(card.rank);
 
-            // POSTIT - GET PILENAME?
-
-            window.center.add(card, false);
-
-            // POSTIT - CHECK THIS HASMORE CHECK FOR IF IT IS CHECKING PILE AS GROUPING OF TWO GROUND CARDS, instead of across the three
             let speed = quantity > 1 ? Pending.slower : Pending.faster;
             let ms = Pending.duration / speed;
-
-            Pending.cards.push(card);
-
-            utils.log(`drop: creating all Pending.cards overlays`);
-            for (let card of Pending.cards) {
-                let overlay = Overlay.create(card);
-                let grow = (progress) => {
-                    overlay.style.height = (100 * progress) + "%";
-                    // console.log(document.body.contains(overlay));
-                }
-                utils.ticker(grow, ms)
-                    .then((message) => Overlay.cleanse(overlay));
-            }
-
-            Pending.timeout(ms);
-
+            Pending.submit(card, card.owner, true, ms);
         }
-        else {
-            utils.log(`drop: cannot play rank ${card.rank}`)
-        }
-
-        utils.log(`drop: reached end of function`)
-
     },
 
     dragend(event) {
-
-        console.warn(`dragend: event handling ${event}`)
-
+        // console.warn(`dragend: event handling ${event}`);
         let dragged = Card.dragged;
         if (dragged) {
-            utils.log(`dragend: toggling hidden to false for ${dragged}`)
+            // utils.log(`dragend: toggling hidden to false for ${dragged}`);
             utils.toggleHidden(Card.dragged, false);
         }
         Card.dragged = null;
-
-        utils.log(`dragend: calling overlay cleanse for center (${center})`)
         Overlay.cleanse(center);
-
+        // utils.log(`dragend: called overlay cleanse for center (${center})`)
     },
 
     // > ========================================================

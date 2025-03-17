@@ -13,7 +13,7 @@ import { Player } from '../player.js';
  */
 export class Card extends HTMLElement {
 
-    static objects = [];
+    static instances = [];
     static suits = ['clubs', 'diamonds', 'hearts', 'spades']
     static ranks = [
         '2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'
@@ -28,7 +28,7 @@ export class Card extends HTMLElement {
     constructor() {
         super();
         this._initialised = false;
-        Card.objects.push(this);
+        Card.instances.push(this);
     }
 
     static get observedAttributes() {
@@ -103,7 +103,7 @@ export class Card extends HTMLElement {
     }
 
     get pile() {
-        let piles = Pile.objects;
+        let piles = Pile.instances;
         for (let pile of piles) {
             if (pile.contains(this)) {
                 return pile;
@@ -113,7 +113,7 @@ export class Card extends HTMLElement {
 
     get owner() {
         let pile = this.pile;
-        let players = Player.objects;
+        let players = Player.instances;
         for (let player of players) {
             if (player.piles.includes(pile)) {
                 return player;

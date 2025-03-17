@@ -2,12 +2,12 @@
 // < Imports
 // < ========================================================
 
-// import { Pile } from './custom-elements/pile.js';
 import { Player } from './player.js';
 import { Card } from './custom-elements/card.js';
 import { Pending } from './pending.js';
 import { utils } from './utils.js';
 import { Overlay } from './custom-elements/overlay.js';
+import { Pile } from './custom-elements/pile.js';
 
 // < ========================================================
 // < Exported Game Object
@@ -20,6 +20,7 @@ export class Game {
     // static inert = false;
     static over = false;
 
+    static debugging = true;
 
     static _inert = false;
 
@@ -28,7 +29,7 @@ export class Game {
     }
 
     static set inert(value) {
-        console.error(`set inert to ${value}`)
+        console.log(`set inert to ${value}`)
         Game._inert = value
     }
 
@@ -50,9 +51,7 @@ export class Game {
         index = ++index % players.length;
         Game.player = players[index];
         Game.update();
-        console.warn(`${Game.player.nickname}'s turn`)
-        // POSTIT - NOT FINAL
-        if (acting && Game.player.nickname !== 'human') {
+        if (acting) {
             Game.player.act();
         }
     }
@@ -69,7 +68,7 @@ export class Game {
 
     static accepts(card) {
 
-        console.error('INERT', Game.inert)
+        console.log('INERT', Game.inert)
 
         function pendingAccepts(card) {
             if (Pending.cards.length < 1) {
@@ -251,11 +250,59 @@ export class Game {
         Game.transferAll(center, burned, false);
     }
 
+    static transfer(card, source, destination, flipped = false) {
+        if (Game.debugging) {
+            if (source === destination) {
+                throw new Error('Game.transfer: Source and destination are the same')
+            }
+            if (source instanceof Pile) {
+                if (!source.cards.includes(card)) {
+                    throw new Error("Game.transfer: Source Pile does not include card")
+                }
+            } else {
+                if (!source.contains(card)) {
+                    throw new Error("Game.transfer: Source Array does not contain card")
+                }
+            }
+    
+            console.log("Checking card:");
+            console.log(" - card instanceof Card:", card instanceof Card);
+            console.log(" - source === Pending.cards:", source === Pending.cards);
+            console.log(" - destination === Pending.cards:", destination === Pending.cards);
+            
+            for (let item of [source, destination]) {
+                console.log("\nChecking item:", item);
+                console.log(" - toString:", Object.prototype.toString.call(item));
+                console.log(" - isArray:", Array.isArray(item));
+                if (item instanceof Pile) {
+                    console.log(" - Pile.id:", item.id);
+                }
+            }
+        }
+
+        console.log("Setting card flip to", flipped, "from", card.flipped);
+        if (destination instanceof Pile) {
+            destination.add(card, flipped);
+        } else {
+            card.flip(flipped);
+            destination.push(card)
+        }
+
+        if (source instanceof Pile) {
+            source.remove(card);
+        } else {
+            const index = source.indexOf(card);
+            if (index !== -1) {
+                source.splice(index, 1)
+            }
+        }
+
+    }
+
     static transferAll(source, destination, flipped = false) {
         const cards = source.querySelectorAll('playing-card');
         cards.forEach(card => {
-            card.flip(flipped);
-            destination.add(card);
+            Game.transfer(card, source, destination, flipped);
         });
     }
 
